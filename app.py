@@ -163,7 +163,7 @@ with tab_activities:
         scraper.config["time_filters"] = time_filters
         scraper.config["keywords"] = keywords
         print(scraper.config)
-        return scraper.search(), scraper.config
+        return scraper.search()
 
     # -------------------------
     # Run search
@@ -173,14 +173,14 @@ with tab_activities:
             st.warning("Please select at least one activity type.")
         else:
             with st.spinner("Searching activities..."):
-                activities, config = run_activity_search(
+                activities = run_activity_search(
                     days_ahead,
                     time_filters,
                     tuple(selected_activities),  # cache-safe
                 )
 
             if not activities:
-                st.info("No activities found for the selected filters.", config)
+                st.info("No activities found for the selected filters.")
             else:
                 st.success(f"Found {len(activities)} activities")
 
