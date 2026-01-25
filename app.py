@@ -1,7 +1,7 @@
 import streamlit as st
 
-from activities import StratfordPadelActivityScraper
-from scraper import StratfordPadelMatchScraper
+from activities_scraper import StratfordPadelActivityScraper
+from matches_scraper import StratfordPadelMatchScraper
 
 # --------------------
 # Page config
