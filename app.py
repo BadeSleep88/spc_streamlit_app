@@ -205,19 +205,19 @@ with tab_activities:
                     st.markdown(
                         f"""
                         <div class="full-width-card">
-                            <b>{a['type']}</b><br>
-                            📅 {a['date']} ({a['day_of_week']})<br>
+                        <b>{a['type']}</b><br>
+                        📅 {a['date']} ({a['day_of_week']})<br>
 
-                            {line("⏰", "Time", a.get("time"))}
-                            {line("👤", "Instructor", a.get("instructor"))}
-                            {line("🎟️", "Vacancies", a.get("vacancies"))}
-                            {line("📍", "Court", a.get("court"))}
+                        {line("⏰", "Time", a.get("time"))}
+                        {line("👤", "Instructor", a.get("instructor"))}
+                        {line("🎟️", "Vacancies", a.get("vacancies"))}
+                        {line("📍", "Court", a.get("court"))}
 
-                            <a href="{a['sign_up_link'].replace('Info.aspx','Share.aspx')}"
-                            target="_blank"
-                            style="color:#4FC3F7;font-weight:bold">
-                            🔗 Open booking
-                            </a>
+                        <a href="{a['sign_up_link'].replace('Info.aspx','Share.aspx')}"
+                        target="_blank"
+                        style="color:#4FC3F7;font-weight:bold">
+                        🔗 Open booking
+                        </a>
                         </div>
                         """,
                         unsafe_allow_html=True,
