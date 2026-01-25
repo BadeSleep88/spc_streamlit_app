@@ -100,65 +100,108 @@ with tab_games:
 # 🏃 FIND ACTIVITIES TAB
 # =====================================================
 with tab_activities:
-    st.subheader("Search Activities")
+    st.subheader("🏃 Find Activities at Stratford Padel Club")
 
-    days_ahead = st.slider("Days ahead", 1, 30, 14)
+    # -------------------------
+    # Search controls
+    # -------------------------
+    days_ahead = st.slider("Days ahead", 1, 30, 7)
 
-    keywords = st.text_input(
-        "Filter by keywords (comma separated)",
-        placeholder="training, social, class",
+    st.subheader("🎾 Activity types")
+
+    ACTIVITY_OPTIONS = [
+        "Train and Play Green",
+        "Padel Academy Green",
+        "Private Class",
+        "PadelConnect Intermediates",
+    ]
+
+    selected_activities = st.multiselect(
+        "Select activities",
+        options=ACTIVITY_OPTIONS,
+        default=ACTIVITY_OPTIONS,
     )
 
     st.subheader("⏰ Time filters")
 
-    def activity_day(label):
+    def activity_day(label, default_start, default_end):
         enabled = st.checkbox(label, True, key=f"a_{label}")
         if not enabled:
             return {"enabled": False}
+
         start, end = st.slider(
             f"{label} time",
-            8,
+            6,
             23,
-            (18, 22),
+            (default_start, default_end),
             key=f"s_{label}",
         )
-        return {"enabled": True, "start_hour": start, "end_hour": end}
+
+        return {
+            "enabled": True,
+            "start_hour": start,
+            "end_hour": end,
+        }
 
     time_filters = {
-        "monday": activity_day("Monday"),
-        "tuesday": activity_day("Tuesday"),
-        "wednesday": activity_day("Wednesday"),
-        "thursday": activity_day("Thursday"),
-        "friday": activity_day("Friday"),
-        "saturday": activity_day("Saturday"),
-        "sunday": activity_day("Sunday"),
+        "monday": activity_day("Monday", 18, 22),
+        "tuesday": activity_day("Tuesday", 18, 22),
+        "wednesday": activity_day("Wednesday", 18, 22),
+        "thursday": activity_day("Thursday", 18, 22),
+        "friday": activity_day("Friday", 18, 22),
+        "saturday": activity_day("Saturday", 10, 22),
+        "sunday": activity_day("Sunday", 12, 20),
     }
 
+    # -------------------------
+    # Cached search runner
+    # -------------------------
     @st.cache_data(ttl=3600)
     def run_activity_search(days_ahead, time_filters, keywords):
         scraper = StratfordPadelActivityScraper()
         scraper.config["days_ahead"] = days_ahead
         scraper.config["time_filters"] = time_filters
-        scraper.config["keywords"] = [k.strip() for k in keywords.split(",") if k.strip()]
+        scraper.config["keywords"] = keywords
         return scraper.search()
 
-    if st.button("Search Activities", type="primary"):
-        with st.spinner("Searching activities..."):
-            activities = run_activity_search(days_ahead, time_filters, keywords)
-
-        if not activities:
-            st.warning("No activities found")
+    # -------------------------
+    # Run search
+    # -------------------------
+    if st.button("🔍 Search Activities", type="primary"):
+        if not selected_activities:
+            st.warning("Please select at least one activity type.")
         else:
-            for a in activities:
-                st.markdown(
-                    f"""
-                    <div style="background:#013A63;color:white;padding:10px;border-radius:10px;margin-bottom:8px">
-                        <b>{a['date']} ({a['day_name']})</b><br>
-                        ⏰ {a['time']}<br>
-                        🏃 {a['title']}<br>
-                        <a href="{a['link']}"
-                           style="color:#1E90FF" target="_blank">🔗 Open</a>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+            with st.spinner("Searching activities..."):
+                activities = run_activity_search(
+                    days_ahead,
+                    time_filters,
+                    tuple(selected_activities),  # cache-safe
                 )
+
+            if not activities:
+                st.info("No activities found for the selected filters.")
+            else:
+                st.success(f"Found {len(activities)} activities")
+
+                for a in activities:
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background:#013A63;
+                            color:white;
+                            padding:12px;
+                            border-radius:12px;
+                            margin-bottom:10px;
+                        ">
+                            <b>{a['title']}</b><br>
+                            📅 {a['date']} ({a['day_name']})<br>
+                            ⏰ {a['time']}<br>
+                            <a href="{a['link']}"
+                               target="_blank"
+                               style="color:#4FC3F7;font-weight:bold">
+                               🔗 Open booking
+                            </a>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
