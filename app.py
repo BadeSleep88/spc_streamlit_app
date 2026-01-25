@@ -204,7 +204,7 @@ with tab_activities:
                             {"👤 <b>Instructor:</b> " + a["instructor"] + "<br>" if a.get("instructor") else ""}
                             {"🎟️ <b>Vacancies:</b> " + str(a["vacancies"]) + "<br>" if a.get("vacancies") is not None else ""}
                             {"📍 <b>Court:</b> " + a["court"] + "<br>" if a.get("court") else ""}
-                            <a href="{a['sign_up_link']}" target="_blank" style="color:#4FC3F7;font-weight:bold">
+                            <a href="{a['sign_up_link'].replace('Info.aspx','Share.aspx')}" target="_blank" style="color:#4FC3F7;font-weight:bold">
                             🔗 Open booking
                             </a>
                         </div>
