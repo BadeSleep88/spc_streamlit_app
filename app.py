@@ -196,7 +196,7 @@ with tab_activities:
                     time_filters,
                     tuple(selected_activities),  # cache-safe
                 )
-
+                print(activities)
             if not activities:
                 st.info("No activities found for the selected filters.")
             else:
