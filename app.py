@@ -105,7 +105,7 @@ def display_matches_grid(matches):
 # --------------------
 st.subheader("🚀 Run search")
 
-if st.button("Run scraper", type="primary"):
+if st.button("Search Matches", type="primary"):
     with st.spinner("Searching for matches..."):
         scraper = StratfordPadelMatchScraper()
         # Apply Streamlit settings
