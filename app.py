@@ -1,146 +1,164 @@
-import json
-from datetime import datetime
-
 import streamlit as st
 
-from scraper import StratfordPadelMatchScraper  # Import your scraper class
+from activities import StratfordPadelActivityScraper
+from scraper import StratfordPadelMatchScraper
 
 # --------------------
 # Page config
 # --------------------
 st.set_page_config(
-    page_title="SPC Padel Match Finder",
+    page_title="SPC Match & Activity Finder",
     page_icon="🎾",
     layout="wide",
 )
 
-st.title("🎾 SPC Padel Match Finder")
+st.title("🎾 SPC Finder")
 st.caption("Private tool")
 st.divider()
 
 # --------------------
-# Session state for tracking running search
+# Tabs
 # --------------------
-if "search_running" not in st.session_state:
-    st.session_state.search_running = False
+tab_games, tab_activities = st.tabs(["🎾 Find Games", "🏃 Find Activities"])
 
-# --------------------
-# Search settings
-# --------------------
-st.subheader("🔍 Search settings")
+# =====================================================
+# 🎾 FIND GAMES TAB
+# =====================================================
+with tab_games:
+    st.subheader("Search Padel Matches")
 
-col1, col2 = st.columns(2)
-with col1:
-    level_min = st.number_input("Minimum rating", min_value=1.5, max_value=7.0, value=2.5, step=0.5)
-with col2:
-    level_max = st.number_input("Maximum rating", min_value=1.5, max_value=7.0, value=3.0, step=0.5)
+    col1, col2 = st.columns(2)
+    with col1:
+        level_min = st.number_input("Min level", 1.5, 7.0, 2.5, 0.5)
+    with col2:
+        level_max = st.number_input("Max level", 1.5, 7.0, 3.0, 0.5)
 
-weeks = st.slider("Weeks to search ahead", min_value=1, max_value=5, value=5)
-st.divider()
+    weeks = st.slider("Weeks ahead", 1, 5, 5)
 
-# --------------------
-# Time filters
-# --------------------
-st.subheader("⏰ Time filters")
+    st.subheader("⏰ Time filters")
 
+    def day_cfg(label):
+        enabled = st.checkbox(label, True)
+        if not enabled:
+            return {"enabled": False}
+        start, end = st.slider(f"{label} time", 8, 23, (18, 23))
+        return {"enabled": True, "start_hour": start, "end_hour": end}
 
-def day_block(label, default_start, default_end):
-    enabled = st.checkbox(label, value=True)
-    if not enabled:
-        return {"enabled": False}
-    start, end = st.slider(f"{label} time window", 8, 22, (default_start, default_end))
-    return {"enabled": True, "start_hour": start, "end_hour": end}
+    weekdays = {
+        "monday": day_cfg("Monday"),
+        "tuesday": day_cfg("Tuesday"),
+        "wednesday": day_cfg("Wednesday"),
+        "thursday": day_cfg("Thursday"),
+        "friday": day_cfg("Friday"),
+    }
 
+    weekends = {
+        "saturday": day_cfg("Saturday"),
+        "sunday": day_cfg("Sunday"),
+    }
 
-weekday_cfg = {
-    "monday": day_block("Monday", 8, 22),
-    "tuesday": day_block("Tuesday", 8, 22),
-    "wednesday": day_block("Wednesday", 8, 22),
-    "thursday": day_block("Thursday", 8, 22),
-    "friday": day_block("Friday", 8, 22),
-}
+    @st.cache_data(ttl=3600)
+    def run_match_search(level_min, level_max, weeks, weekdays, weekends):
+        scraper = StratfordPadelMatchScraper()
+        scraper.config["search_settings"]["level_range"]["min"] = level_min
+        scraper.config["search_settings"]["level_range"]["max"] = level_max
+        scraper.config["search_settings"]["weeks_to_search"] = weeks
+        scraper.config["time_filters"]["weekdays"] = weekdays
+        scraper.config["time_filters"]["weekends"] = weekends
 
-weekend_cfg = {
-    "saturday": day_block("Saturday", 8, 22),
-    "sunday": day_block("Sunday", 8, 22),
-}
+        all_matches = []
+        for start, end in scraper.get_week_ranges():
+            html = scraper.fetch_matches_page(start, end)
+            if html:
+                all_matches.extend(scraper.parse_matches(html))
 
-st.divider()
+        filtered = scraper.filter_matches_by_time(all_matches)
+        return scraper.add_date_info(filtered)
 
+    if st.button("Search Matches", type="primary"):
+        with st.spinner("Searching matches..."):
+            matches = run_match_search(level_min, level_max, weeks, weekdays, weekends)
 
-# --------------------
-# Cached scraper
-# --------------------
-@st.cache_data(ttl=3600, show_spinner=False)
-def cached_scraper(level_min, level_max, weeks, weekday_cfg, weekend_cfg):
-    scraper = StratfordPadelMatchScraper()
-    scraper.config["search_settings"]["level_range"]["min"] = level_min
-    scraper.config["search_settings"]["level_range"]["max"] = level_max
-    scraper.config["search_settings"]["weeks_to_search"] = weeks
-    scraper.config["time_filters"]["weekdays"] = weekday_cfg
-    scraper.config["time_filters"]["weekends"] = weekend_cfg
-    scraper.config["debug_settings"]["verbose_logging"] = False
-    scraper.config["debug_settings"]["save_raw_html"] = False
-
-    all_matches = []
-    for start_date, end_date in scraper.get_week_ranges():
-        html = scraper.fetch_matches_page(start_date, end_date)
-        week_matches = scraper.parse_matches(html)
-        all_matches.extend(week_matches)
-
-    filtered_matches = scraper.filter_matches_by_time(all_matches)
-    matches_with_dates = scraper.add_date_info(filtered_matches)
-    return matches_with_dates
-
-
-# --------------------
-# Display matches
-# --------------------
-def display_matches_grid(matches):
-    if not matches:
-        st.warning("No matches found matching the criteria.")
-        return
-
-    st.markdown(f"### 🎾 Total matches: {len(matches)}")
-    st.divider()
-
-    num_cols = 2
-    for i in range(0, len(matches), num_cols):
-        cols = st.columns(num_cols)
-        for j, match in enumerate(matches[i : i + num_cols]):
-            with cols[j]:
+        if not matches:
+            st.warning("No matches found")
+        else:
+            for m in matches:
                 st.markdown(
                     f"""
-                    <div style="
-                        padding: 10px; 
-                        border-radius: 10px; 
-                        background-color: #013A63;  /* French Navy Blue */
-                        color: white;               /* White text */
-                        margin-bottom: 10px;
-                    ">
-                        <p style='margin:2px'><strong>{match['date']} ({match['day_of_week']})</strong></p>
-                        <p style='margin:2px'>Time: {match['time']}</p>
-                        <p style='margin:2px'>Level: {match['level_range']}</p>
-                        <p style='margin:2px'>Type: {match['type']}</p>
-                        {"<p style='margin:2px'><a href=\"" + match['link'].replace('Match.aspx','Share.aspx') + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
+                    <div style="background:#013A63;color:white;padding:10px;border-radius:10px;margin-bottom:8px">
+                        <b>{m['date']} ({m['day_of_week']})</b><br>
+                        ⏰ {m['time']}<br>
+                        🎯 {m['level_range']}<br>
+                        <a href="{m['link'].replace('Match.aspx','Share.aspx')}"
+                           style="color:#1E90FF" target="_blank">🔗 Open</a>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
+# =====================================================
+# 🏃 FIND ACTIVITIES TAB
+# =====================================================
+with tab_activities:
+    st.subheader("Search Activities")
 
-# --------------------
-# Run search button
-# --------------------
-st.subheader("🚀 Run search")
+    days_ahead = st.slider("Days ahead", 1, 30, 14)
 
-if st.session_state.search_running:
-    st.info("A search is already running... please wait 🕐")
-else:
-    if st.button("Search Matches", type="primary"):
-        st.session_state.search_running = True
-        with st.spinner("Searching for matches..."):
-            results = cached_scraper(level_min, level_max, weeks, weekday_cfg, weekend_cfg)
-        display_matches_grid(results)
-        st.session_state.search_running = False
-        st.success("Search complete ✅")
+    keywords = st.text_input(
+        "Filter by keywords (comma separated)",
+        placeholder="training, social, class",
+    )
+
+    st.subheader("⏰ Time filters")
+
+    def activity_day(label):
+        enabled = st.checkbox(label, True, key=f"a_{label}")
+        if not enabled:
+            return {"enabled": False}
+        start, end = st.slider(
+            f"{label} time",
+            8,
+            23,
+            (18, 22),
+            key=f"s_{label}",
+        )
+        return {"enabled": True, "start_hour": start, "end_hour": end}
+
+    time_filters = {
+        "monday": activity_day("Monday"),
+        "tuesday": activity_day("Tuesday"),
+        "wednesday": activity_day("Wednesday"),
+        "thursday": activity_day("Thursday"),
+        "friday": activity_day("Friday"),
+        "saturday": activity_day("Saturday"),
+        "sunday": activity_day("Sunday"),
+    }
+
+    @st.cache_data(ttl=3600)
+    def run_activity_search(days_ahead, time_filters, keywords):
+        scraper = StratfordPadelActivityScraper()
+        scraper.config["days_ahead"] = days_ahead
+        scraper.config["time_filters"] = time_filters
+        scraper.config["keywords"] = [k.strip() for k in keywords.split(",") if k.strip()]
+        return scraper.search()
+
+    if st.button("Search Activities", type="primary"):
+        with st.spinner("Searching activities..."):
+            activities = run_activity_search(days_ahead, time_filters, keywords)
+
+        if not activities:
+            st.warning("No activities found")
+        else:
+            for a in activities:
+                st.markdown(
+                    f"""
+                    <div style="background:#013A63;color:white;padding:10px;border-radius:10px;margin-bottom:8px">
+                        <b>{a['date']} ({a['day_name']})</b><br>
+                        ⏰ {a['time']}<br>
+                        🏃 {a['title']}<br>
+                        <a href="{a['link']}"
+                           style="color:#1E90FF" target="_blank">🔗 Open</a>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
