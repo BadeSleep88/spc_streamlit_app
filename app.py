@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 st.title("🎾 SPC Padel Match Finder")
-st.caption("Private tool · Compact & Visual Layout")
+st.caption("Private tool")
 
 st.divider()
 
