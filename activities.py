@@ -21,24 +21,8 @@ class StratfordPadelActivityScraper:
 
         # Load configuration
         self.config = self.load_config(config_file)
-        print("Activity scraper initialized successfully!")
-
-        # Parse activity names from config
-        activity_name_config = self.config.get("activity_search", {}).get(
-            "activity_name", "Train and Play Orange"
-        )
-        self.activity_names = (
-            activity_name_config if isinstance(activity_name_config, list) else [activity_name_config]
-        )
-
-        # Days to search
-        self.days_to_search = self.config.get("activity_search", {}).get("days_to_search", 45)
-
-        # Output files
-        self.output_filename = self.config.get("activity_search", {}).get(
-            "output_filename", "activity_sessions.txt"
-        )
-        self.all_sessions_filename = "all_activity_sessions.txt"
+        print("Match scraper initialized successfully!")
+        print(f"Configuration loaded from: {config_file}")
 
     def load_config(self, config_file: str) -> Dict:
         try:

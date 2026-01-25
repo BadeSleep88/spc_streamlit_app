@@ -156,12 +156,15 @@ with tab_activities:
         return {"enabled": True, "start_hour": start, "end_hour": end}
 
     # Time filters dictionary
-    time_filters = {
+    weekdays = {
         "monday": activity_day("Monday", 8, 22),
         "tuesday": activity_day("Tuesday", 8, 22),
         "wednesday": activity_day("Wednesday", 8, 22),
         "thursday": activity_day("Thursday", 8, 22),
         "friday": activity_day("Friday", 8, 22),
+    }
+    # Time filters dictionary
+    weekends = {
         "saturday": activity_day("Saturday", 8, 22),
         "sunday": activity_day("Sunday", 8, 22),
     }
@@ -170,10 +173,11 @@ with tab_activities:
     # Cached search runner
     # -------------------------
     @st.cache_data(ttl=3600, show_spinner=False)
-    def run_activity_search(days_ahead, time_filters, keywords):
+    def run_activity_search(days_ahead, weekdays, weekends, keywords):
         scraper = StratfordPadelActivityScraper()
         scraper.config["days_ahead"] = days_ahead
-        scraper.config["time_filters"] = time_filters
+        scraper.config["time_filters"]["weekdays"] = weekdays
+        scraper.config["time_filters"]["weekends"] = weekends
         scraper.config["activity_search"] = {"activity_name": list(keywords)}
         return scraper.search_for_sessions()  # Updated method that returns filtered + sorted sessions
 
@@ -187,7 +191,8 @@ with tab_activities:
             with st.spinner("Searching activities..."):
                 activities = run_activity_search(
                     days_ahead,
-                    time_filters,
+                    weekdays,
+                    weekends,
                     tuple(selected_activities),  # cache-safe
                 )
 
