@@ -527,28 +527,33 @@ def main():
 
     app = typer.Typer(help="Stratford Padel Club Match Finder")
 
-    @app.command()
-    def run(
-        level_min: float = typer.Option(None),
-        level_max: float = typer.Option(None),
-        weeks: int = typer.Option(None),
+    @app.callback()
+    def cli(
+        level_min: float = typer.Option(None, help="Minimum player level"),
+        level_max: float = typer.Option(None, help="Maximum player level"),
+        weeks: int = typer.Option(None, help="Weeks to search"),
         weekdays: str = typer.Option(None, help="Weekday config JSON"),
         weekends: str = typer.Option(None, help="Weekend config JSON"),
-        verbose: bool = typer.Option(False),
-        save_html: bool = typer.Option(False),
+        verbose: bool = typer.Option(False, help="Verbose logging"),
+        save_html: bool = typer.Option(False, help="Save raw HTML"),
     ):
         scraper = StratfordPadelMatchScraper()
 
+        # ---- Search overrides ----
         if level_min is not None:
             scraper.config["search_settings"]["level_range"]["min"] = level_min
         if level_max is not None:
             scraper.config["search_settings"]["level_range"]["max"] = level_max
         if weeks is not None:
             scraper.config["search_settings"]["weeks_to_search"] = weeks
+
+        # ---- Time filters ----
         if weekdays:
             scraper.config["time_filters"]["weekdays"] = json.loads(weekdays)
         if weekends:
             scraper.config["time_filters"]["weekends"] = json.loads(weekends)
+
+        # ---- Debug ----
         if verbose:
             scraper.config["debug_settings"]["verbose_logging"] = True
         if save_html:
