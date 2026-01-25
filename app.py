@@ -1,7 +1,9 @@
 import json
-import subprocess
+from datetime import datetime
 
 import streamlit as st
+
+from scraper import StratfordPadelMatchScraper  # Make sure this is your scraper class
 
 # --------------------
 # Page config
@@ -13,7 +15,7 @@ st.set_page_config(
 )
 
 st.title("🎾 Stratford Padel Match Finder")
-st.caption("Private tool · Configurable · CLI-backed")
+st.caption("Private tool · Configurable · Streamlit UI")
 
 st.divider()
 
@@ -51,9 +53,6 @@ weeks = st.slider(
 
 st.divider()
 
-# --------------------
-# Time filters
-# --------------------
 # --------------------
 # Time filters
 # --------------------
@@ -95,45 +94,61 @@ weekend_cfg = {
 
 st.divider()
 
+
 # --------------------
-# Run
+# Display function for matches
+# --------------------
+def display_matches_streamlit(matches):
+    if not matches:
+        st.warning("No matches found matching the criteria.")
+        return
+
+    st.markdown(f"### 🎾 Total matches: {len(matches)}")
+    st.markdown("---")
+
+    for i, match in enumerate(matches, 1):
+        with st.expander(f"Match {i}: {match['date']} ({match['day_of_week']})"):
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.markdown(f"**Time:** {match['time']}")
+                st.markdown(f"**Level:** {match['level_range']}")
+                st.markdown(f"**Type:** {match['type']}")
+            with col2:
+                if match.get("link"):
+                    st.markdown(f"[🔗 Match Link]({match['link']})", unsafe_allow_html=True)
+            st.divider()
+
+
+# --------------------
+# Run scraper
 # --------------------
 st.subheader("🚀 Run search")
 
 if st.button("Run scraper", type="primary"):
     with st.spinner("Searching for matches..."):
-        import sys
+        scraper = StratfordPadelMatchScraper()
 
-        cmd = [
-            sys.executable,  # use Streamlit's Python
-            "scraper.py",
-            "--level-min",
-            str(level_min),
-            "--level-max",
-            str(level_max),
-            "--weeks",
-            str(weeks),
-            "--weekdays",
-            json.dumps(weekday_cfg),
-            "--weekends",
-            json.dumps(weekend_cfg),
-            "--verbose",
-        ]
+        # Apply Streamlit config
+        scraper.config["search_settings"]["level_range"]["min"] = level_min
+        scraper.config["search_settings"]["level_range"]["max"] = level_max
+        scraper.config["search_settings"]["weeks_to_search"] = weeks
+        scraper.config["time_filters"]["weekdays"] = weekday_cfg
+        scraper.config["time_filters"]["weekends"] = weekend_cfg
+        scraper.config["debug_settings"]["verbose_logging"] = True
+        scraper.config["debug_settings"]["save_raw_html"] = False
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-        )
+        # Fetch matches across all weeks
+        all_matches = []
+        for start_date, end_date in scraper.get_week_ranges():
+            html = scraper.fetch_matches_page(start_date, end_date)
+            week_matches = scraper.parse_matches(html)
+            all_matches.extend(week_matches)
+
+        # Filter and add date info
+        filtered_matches = scraper.filter_matches_by_time(all_matches)
+        matches_with_dates = scraper.add_date_info(filtered_matches)
+
+        # Display in Streamlit
+        display_matches_streamlit(matches_with_dates)
 
     st.success("Search complete")
-
-    if result.stdout:
-        st.text_area(
-            "Output",
-            value=result.stdout,
-            height=350,
-        )
-
-    if result.stderr:
-        st.error(result.stderr)

@@ -525,7 +525,6 @@ def main():
 
     # Allow the callback to run directly when no command is provided
     app = typer.Typer(invoke_without_command=True)
-    print("CALLBACKCLI")  # just to see main() is called
 
     @app.callback(invoke_without_command=True)
     def cli(
@@ -536,7 +535,6 @@ def main():
         weekends: str = typer.Option(None, help="Weekend config JSON"),
         verbose: bool = typer.Option(False, help="Verbose logging"),
     ):
-        print("SCRAPER SET UP")  # this should now actually print
         scraper = StratfordPadelMatchScraper()
 
         if level_min is not None:
