@@ -107,7 +107,6 @@ if st.button("Run scraper", type="primary"):
         cmd = [
             sys.executable,  # use Streamlit's Python
             "scraper.py",
-            "run",
             "--level-min",
             str(level_min),
             "--level-max",
