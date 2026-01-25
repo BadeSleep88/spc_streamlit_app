@@ -1,10 +1,9 @@
 import json
-import threading
 from datetime import datetime
 
 import streamlit as st
 
-from scraper import StratfordPadelMatchScraper
+from scraper import StratfordPadelMatchScraper  # Import your scraper class
 
 # --------------------
 # Page config
@@ -63,44 +62,9 @@ weekend_cfg = {
 
 st.divider()
 
-# --------------------
-# Session state for non-blocking scraper
-# --------------------
-if "scrape_status" not in st.session_state:
-    st.session_state.scrape_status = "idle"
-if "scrape_results" not in st.session_state:
-    st.session_state.scrape_results = []
-if "scrape_time" not in st.session_state:
-    st.session_state.scrape_time = None
-
 
 # --------------------
-# Cached scraper function
-# --------------------
-@st.cache_data(show_spinner=False)
-def cached_scraper(level_min, level_max, weeks, weekday_cfg, weekend_cfg):
-    scraper = StratfordPadelMatchScraper()
-    scraper.config["search_settings"]["level_range"]["min"] = level_min
-    scraper.config["search_settings"]["level_range"]["max"] = level_max
-    scraper.config["search_settings"]["weeks_to_search"] = weeks
-    scraper.config["time_filters"]["weekdays"] = weekday_cfg
-    scraper.config["time_filters"]["weekends"] = weekend_cfg
-    scraper.config["debug_settings"]["verbose_logging"] = False
-    scraper.config["debug_settings"]["save_raw_html"] = False
-
-    all_matches = []
-    for start_date, end_date in scraper.get_week_ranges():
-        html = scraper.fetch_matches_page(start_date, end_date)
-        week_matches = scraper.parse_matches(html)
-        all_matches.extend(week_matches)
-
-    filtered_matches = scraper.filter_matches_by_time(all_matches)
-    matches_with_dates = scraper.add_date_info(filtered_matches)
-    return matches_with_dates
-
-
-# --------------------
-# Function to display matches
+# Function to display matches in a 2-column grid
 # --------------------
 def display_matches_grid(matches):
     if not matches:
@@ -110,6 +74,7 @@ def display_matches_grid(matches):
     st.markdown(f"### 🎾 Total matches: {len(matches)}")
     st.divider()
 
+    # Two-column grid
     num_cols = 2
     for i in range(0, len(matches), num_cols):
         cols = st.columns(num_cols)
@@ -128,7 +93,7 @@ def display_matches_grid(matches):
                         <p style='margin:2px'>Time: {match['time']}</p>
                         <p style='margin:2px'>Level: {match['level_range']}</p>
                         <p style='margin:2px'>Type: {match['type']}</p>
-                        {"<p style='margin:2px'><a href=\"" + match['link'].replace('Match.aspx', 'Share.aspx') + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
+                        {"<p style='margin:2px'><a href=\"" + match['link'].replace("Match.aspx", "Share.aspx") + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -136,30 +101,33 @@ def display_matches_grid(matches):
 
 
 # --------------------
-# Run scraper button
+# Run scraper
 # --------------------
 st.subheader("🚀 Run search")
 
 if st.button("Search Matches", type="primary"):
-    if st.session_state.scrape_status == "running":
-        st.warning("Scraper is already running!")
-    else:
-        st.session_state.scrape_status = "running"
+    with st.spinner("Searching for matches..."):
+        scraper = StratfordPadelMatchScraper()
+        # Apply Streamlit settings
+        scraper.config["search_settings"]["level_range"]["min"] = level_min
+        scraper.config["search_settings"]["level_range"]["max"] = level_max
+        scraper.config["search_settings"]["weeks_to_search"] = weeks
+        scraper.config["time_filters"]["weekdays"] = weekday_cfg
+        scraper.config["time_filters"]["weekends"] = weekend_cfg
+        scraper.config["debug_settings"]["verbose_logging"] = True
+        scraper.config["debug_settings"]["save_raw_html"] = False
 
-        def run_threaded_scraper():
-            results = cached_scraper(level_min, level_max, weeks, weekday_cfg, weekend_cfg)
-            st.session_state.scrape_results = results
-            st.session_state.scrape_status = "done"
-            st.session_state.scrape_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        # Get matches
+        all_matches = []
+        for start_date, end_date in scraper.get_week_ranges():
+            html = scraper.fetch_matches_page(start_date, end_date)
+            week_matches = scraper.parse_matches(html)
+            all_matches.extend(week_matches)
 
-        threading.Thread(target=run_threaded_scraper, daemon=True).start()
+        filtered_matches = scraper.filter_matches_by_time(all_matches)
+        matches_with_dates = scraper.add_date_info(filtered_matches)
 
-# --------------------
-# Show status / results
-# --------------------
-if st.session_state.scrape_status == "running":
-    st.info("Scraper is running... please wait 🕐")
+        # Display matches
+        display_matches_grid(matches_with_dates)
 
-if st.session_state.scrape_status == "done":
-    st.success(f"Scraping done! Results generated at {st.session_state.scrape_time}")
-    display_matches_grid(st.session_state.scrape_results)
+    st.success("Search complete")
