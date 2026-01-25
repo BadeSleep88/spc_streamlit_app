@@ -37,8 +37,8 @@ class StratfordPadelActivityScraper:
     def default_config(self) -> Dict:
         return {
             "activity_search": {
-                "activity_name": ["Train and Play Orange"],
-                "days_to_search": 45,
+                "activity_name": ["Train and Play Orange", "Private Class"],
+                "days_to_search": 4,
                 "output_filename": "activity_sessions.txt",
             },
             "time_filters": {
@@ -208,9 +208,11 @@ def main():
     ):
         scraper = StratfordPadelActivityScraper()
         if activity_names:
-            scraper.activity_names = [name.strip() for name in activity_names.split(",")]
+            scraper.config["activity_search"]["activity_name"] = [
+                name.strip() for name in activity_names.split(",")
+            ]
         if days:
-            scraper.days_to_search = days
+            scraper.config["activity_search"]["days_to_search"] = days
         if weekdays:
             scraper.config["time_filters"]["weekdays"] = json.loads(weekdays)
         if weekends:
