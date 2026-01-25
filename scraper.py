@@ -524,7 +524,7 @@ def main():
     import typer
 
     app = typer.Typer(help="Stratford Padel Club Match Finder")
-    print("CALLBACKCLI")
+    print("CALLBACKCLI")  # just to see main() is called
 
     @app.callback()
     def cli(
@@ -535,7 +535,7 @@ def main():
         weekends: str = typer.Option(None, help="Weekend config JSON"),
         verbose: bool = typer.Option(False, help="Verbose logging"),
     ):
-        print("SCRAPER SET UP")
+        print("SCRAPER SET UP")  # this should now actually print
         scraper = StratfordPadelMatchScraper()
 
         if level_min is not None:
@@ -552,8 +552,10 @@ def main():
             scraper.config["debug_settings"]["verbose_logging"] = True
 
         scraper.config["debug_settings"]["save_raw_html"] = False
-
         scraper.search_for_matches()
+
+    # <--- THIS LINE IS MISSING IN YOUR CURRENT CODE
+    app()  # actually runs the Typer CLI
 
 
 if __name__ == "__main__":
