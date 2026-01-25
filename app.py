@@ -12,6 +12,35 @@ st.set_page_config(
     layout="wide",
 )
 
+# --------------------
+# Custom CSS for bigger tabs and full-width
+# --------------------
+st.markdown(
+    """
+    <style>
+    /* Make tabs bigger */
+    div[data-baseweb="tab-list"] button {
+        font-size: 18px;
+        padding: 12px 24px;
+    }
+    /* Make cards full width */
+    .full-width-card {
+        width: 100%;
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        background: #013A63;
+        color: white;
+    }
+    /* Add spacing between controls */
+    .control-spacing {
+        margin-bottom: 12px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("🎾 SPC Finder")
 st.caption("Private tool")
 st.divider()
@@ -27,35 +56,28 @@ tab_games, tab_activities = st.tabs(["🎾 Find Games", "🏃 Find Activities"])
 with tab_games:
     st.subheader("Search Padel Matches")
 
+    # Level inputs
     col1, col2 = st.columns(2)
     with col1:
-        level_min = st.number_input("Min level", 1.5, 7.0, 2.5, 0.5)
+        level_min = st.number_input("Min level", 1.5, 7.0, 2.5, 0.5, key="g_min_level")
     with col2:
-        level_max = st.number_input("Max level", 1.5, 7.0, 3.0, 0.5)
+        level_max = st.number_input("Max level", 1.5, 7.0, 3.0, 0.5, key="g_max_level")
 
-    weeks = st.slider("Weeks ahead", 1, 5, 5)
+    weeks = st.slider("Weeks ahead", 1, 5, 5, key="g_weeks")
 
     st.subheader("⏰ Time filters")
 
-    def day_cfg(label):
-        enabled = st.checkbox(label, True)
+    def day_cfg(label, default_start=18, default_end=23):
+        enabled = st.checkbox(label, True, key=f"g_{label}")
         if not enabled:
             return {"enabled": False}
-        start, end = st.slider(f"{label} time", 8, 23, (18, 23))
+        start, end = st.slider(f"{label} time", 8, 23, (default_start, default_end), key=f"g_s_{label}")
         return {"enabled": True, "start_hour": start, "end_hour": end}
 
-    weekdays = {
-        "monday": day_cfg("Monday"),
-        "tuesday": day_cfg("Tuesday"),
-        "wednesday": day_cfg("Wednesday"),
-        "thursday": day_cfg("Thursday"),
-        "friday": day_cfg("Friday"),
+    weekdays_g = {
+        day: day_cfg(day.capitalize()) for day in ["monday", "tuesday", "wednesday", "thursday", "friday"]
     }
-
-    weekends = {
-        "saturday": day_cfg("Saturday"),
-        "sunday": day_cfg("Sunday"),
-    }
+    weekends_g = {day: day_cfg(day.capitalize()) for day in ["saturday", "sunday"]}
 
     @st.cache_data(ttl=3600, show_spinner=False)
     def run_match_search(level_min, level_max, weeks, weekdays, weekends):
@@ -75,9 +97,9 @@ with tab_games:
         filtered = scraper.filter_matches_by_time(all_matches)
         return scraper.add_date_info(filtered)
 
-    if st.button("Search Matches", type="primary"):
+    if st.button("Search Matches", type="primary", key="search_games"):
         with st.spinner("Searching matches..."):
-            matches = run_match_search(level_min, level_max, weeks, weekdays, weekends)
+            matches = run_match_search(level_min, level_max, weeks, weekdays_g, weekends_g)
 
         if not matches:
             st.warning("No matches found")
@@ -85,11 +107,11 @@ with tab_games:
             for m in matches:
                 st.markdown(
                     f"""
-                    <div style="background:#013A63;color:white;padding:10px;border-radius:10px;margin-bottom:8px">
+                    <div class="full-width-card">
                         <b>{m['date']} ({m['day_of_week']})</b><br>
                         ⏰ {m['time']}<br>
                         🎯 {m['level_range']}<br>
-                        <a href="{m['link'].replace('Match.aspx','Share.aspx')}"
+                        <a href="{m['link'].replace('Match.aspx','Share.aspx')}" 
                            style="color:#1E90FF" target="_blank">🔗 Open</a>
                     </div>
                     """,
@@ -100,12 +122,9 @@ with tab_games:
 # 🏃 FIND ACTIVITIES TAB
 # =====================================================
 with tab_activities:
-    st.subheader("🏃 Find Activities at Stratford Padel Club")
+    st.subheader("Find Activities at Stratford Padel Club")
 
-    # -------------------------
-    # Search controls
-    # -------------------------
-    days_ahead = st.slider("Days ahead", 1, 42, 7)
+    days_ahead = st.slider("Days ahead", 1, 42, 7, key="a_days_ahead")
 
     st.subheader("🎾 Activity types")
 
@@ -126,7 +145,6 @@ with tab_activities:
         "PadelConnect Advanced",
         "Matchplay with coach",
     ]
-
     DEFAULT_OPTIONS = [
         "Train and Play Green",
         "Padel Academy Green",
@@ -135,43 +153,24 @@ with tab_activities:
     ]
 
     selected_activities = st.multiselect(
-        "Select activities",
-        options=ACTIVITY_OPTIONS,
-        default=DEFAULT_OPTIONS,
+        "Select activities", options=ACTIVITY_OPTIONS, default=DEFAULT_OPTIONS, key="a_selected_activities"
     )
 
     st.subheader("⏰ Time filters")
 
-    def activity_day(label, default_start, default_end):
+    def activity_day(label, default_start=8, default_end=22):
         enabled = st.checkbox(label, True, key=f"a_{label}")
         if not enabled:
             return {"enabled": False}
-        start, end = st.slider(
-            f"{label} time",
-            8,
-            22,
-            (default_start, default_end),
-            key=f"s_{label}",
-        )
+        start, end = st.slider(f"{label} time", 8, 22, (default_start, default_end), key=f"a_s_{label}")
         return {"enabled": True, "start_hour": start, "end_hour": end}
 
-    # Time filters dictionary
-    weekdays = {
-        "monday": activity_day("Monday", 8, 22),
-        "tuesday": activity_day("Tuesday", 8, 22),
-        "wednesday": activity_day("Wednesday", 8, 22),
-        "thursday": activity_day("Thursday", 8, 22),
-        "friday": activity_day("Friday", 8, 22),
+    weekdays_a = {
+        day: activity_day(day.capitalize())
+        for day in ["monday", "tuesday", "wednesday", "thursday", "friday"]
     }
-    # Time filters dictionary
-    weekends = {
-        "saturday": activity_day("Saturday", 8, 22),
-        "sunday": activity_day("Sunday", 8, 22),
-    }
+    weekends_a = {day: activity_day(day.capitalize()) for day in ["saturday", "sunday"]}
 
-    # -------------------------
-    # Cached search runner
-    # -------------------------
     @st.cache_data(ttl=3600, show_spinner=False)
     def run_activity_search(days_ahead, weekdays, weekends, selected_activities):
         scraper = StratfordPadelActivityScraper()
@@ -179,22 +178,15 @@ with tab_activities:
         scraper.config["time_filters"]["weekdays"] = weekdays
         scraper.config["time_filters"]["weekends"] = weekends
         scraper.config["activity_search"]["activity_name"] = list(selected_activities)
-        print(scraper.config)
-        return scraper.search_for_sessions()  # Updated method that returns filtered + sorted sessions
+        return scraper.search_for_sessions()  # returns filtered + sorted sessions
 
-    # -------------------------
-    # Run search
-    # -------------------------
-    if st.button("🔍 Search Activities", type="primary"):
+    if st.button("🔍 Search Activities", type="primary", key="search_activities"):
         if not selected_activities:
             st.warning("Please select at least one activity type.")
         else:
             with st.spinner("Searching activities..."):
                 activities = run_activity_search(
-                    days_ahead,
-                    weekdays,
-                    weekends,
-                    tuple(selected_activities),  # cache-safe
+                    days_ahead, weekdays_a, weekends_a, tuple(selected_activities)
                 )
 
             if not activities:
@@ -202,26 +194,17 @@ with tab_activities:
             else:
                 st.success(f"Found {len(activities)} activities")
 
-                # Display in markdown cards like games tab
                 for a in activities:
                     st.markdown(
                         f"""
-                        <div style="
-                            background:#013A63;
-                            color:white;
-                            padding:12px;
-                            border-radius:12px;
-                            margin-bottom:10px;
-                        ">
+                        <div class="full-width-card">
                             <b>{a['type']}</b><br>
                             📅 {a['date']} ({a['day_of_week']})<br>
                             ⏰ {a['time']}<br>
                             {"👤 <b>Instructor:</b> " + a["instructor"] + "<br>" if a.get("instructor") else ""}
                             {"🎟️ <b>Vacancies:</b> " + str(a["vacancies"]) + "<br>" if a.get("vacancies") is not None else ""}
                             {"📍 <b>Court:</b> " + a["court"] + "<br>" if a.get("court") else ""}
-                            <a href="{a['sign_up_link']}"
-                            target="_blank"
-                            style="color:#4FC3F7;font-weight:bold">
+                            <a href="{a['sign_up_link']}" target="_blank" style="color:#4FC3F7;font-weight:bold">
                             🔗 Open booking
                             </a>
                         </div>
