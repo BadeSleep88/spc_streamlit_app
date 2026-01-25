@@ -199,7 +199,7 @@ with tab_activities:
                         <div class="full-width-card">
                             <b>{a['type']}</b><br>
                             📅 {a['date']} ({a['day_of_week']})<br>
-                            {"⏰ <b>Start Time:</b> " + m["time"] + "<br>" if m.get("time") else ""}
+                            {"⏰ <b>Start Time:</b> " + a["time"] + "<br>" if a.get("time") else ""}
                             {"👤 <b>Instructor:</b> " + a["instructor"] + "<br>" if a.get("instructor") else ""}
                             {"🎟️ <b>Vacancies:</b> " + str(a["vacancies"]) + "<br>" if a.get("vacancies") is not None else ""}
                             {"📍 <b>Court:</b> " + a["court"] + "<br>" if a.get("court") else ""}
