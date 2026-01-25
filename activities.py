@@ -57,7 +57,7 @@ class StratfordPadelActivityScraper:
     def get_date_range(self) -> List[str]:
         dates = []
         today = datetime.now()
-        for i in range(self.config["search_settings"]["days_to_search"]):
+        for i in range(self.config["activity_search"]["days_to_search"]):
             dates.append((today + timedelta(days=i)).strftime("%d-%m-%Y"))
         return dates
 
