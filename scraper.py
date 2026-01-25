@@ -535,6 +535,7 @@ def main():
         weekends: str = typer.Option(None, help="Weekend config JSON"),
         verbose: bool = typer.Option(False, help="Verbose logging"),
     ):
+        print("SCRAPER SET UP")
         scraper = StratfordPadelMatchScraper()
 
         if level_min is not None:
