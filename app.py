@@ -57,7 +57,7 @@ with tab_games:
         "sunday": day_cfg("Sunday"),
     }
 
-    @st.cache_data(ttl=3600)
+    @st.cache_data(ttl=3600, show_spinner=False)
     def run_match_search(level_min, level_max, weeks, weekdays, weekends):
         scraper = StratfordPadelMatchScraper()
         scraper.config["search_settings"]["level_range"]["min"] = level_min
