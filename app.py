@@ -174,7 +174,7 @@ with tab_activities:
     # -------------------------
     # Cached search runner
     # -------------------------
-    @st.cache_data(ttl=3600)
+    @st.cache_data(ttl=3600, show_spinner=False)
     def run_activity_search(days_ahead, time_filters, keywords):
         scraper = StratfordPadelActivityScraper()
         scraper.config["days_ahead"] = days_ahead
