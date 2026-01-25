@@ -70,7 +70,7 @@ with tab_games:
     with col2:
         level_max = st.number_input("Max level", 1.5, 7.0, 3.5, 0.5, key="g_max_level")
 
-    weeks = st.slider("Weeks ahead", 1, 5, 5, key="g_weeks")
+    weeks = st.slider("Weeks to search ahead", 1, 5, 5, key="g_weeks")
 
     st.subheader("⏰ Time filters")
 
