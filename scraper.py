@@ -10,8 +10,6 @@ try:
 
     import requests
     from bs4 import BeautifulSoup
-
-    print("All dependencies imported successfully!")
 except ImportError as e:
     print(f"Missing dependency: {e}")
     print("Please install required packages:")
@@ -364,47 +362,43 @@ class StratfordPadelMatchScraper:
         """
         return sorted(matches, key=lambda x: x["datetime_obj"])
 
-    def write_matches_to_file(self, matches: List[Dict], filename: str = None):
+    def print_matches(self, matches: List[Dict]):
         """
-        Write match details to a text file
+        Print match details to the console instead of writing to a file.
 
         Args:
             matches: List of match dictionaries
-            filename: Output filename (uses config if None)
         """
-        if filename is None:
-            filename = self.config["search_settings"]["output_filename"]
-
         level_min = self.config["search_settings"]["level_range"]["min"]
         level_max = self.config["search_settings"]["level_range"]["max"]
         weeks_to_search = self.config["search_settings"]["weeks_to_search"]
 
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write("=" * 80 + "\n")
-            f.write("PADEL MATCHES - STRATFORD PADEL CLUB\n")
-            f.write(f"Level: {level_min:.2f} - {level_max:.2f}\n")
-            f.write("=" * 80 + "\n")
-            f.write(f"Generated on: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-            f.write(f"Search Method: {weeks_to_search} separate week calls\n")
-            f.write(f"Total Matches Found: {len(matches)}\n")
-            f.write("Time Filter: Based on configuration\n")
-            f.write("=" * 80 + "\n\n")
+        print("=" * 80)
+        print("PADEL MATCHES - STRATFORD PADEL CLUB")
+        print(f"Level: {level_min:.2f} - {level_max:.2f}")
+        print("=" * 80)
+        print(f"Generated on: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+        print(f"Search Method: {weeks_to_search} separate week calls")
+        print(f"Total Matches Found: {len(matches)}")
+        print("Time Filter: Based on configuration")
+        print("=" * 80)
+        print()
 
-            if not matches:
-                f.write("No matches found matching the criteria.\n")
-                return
+        if not matches:
+            print("No matches found matching the criteria.")
+            return
 
-            for i, match in enumerate(matches, 1):
-                f.write(f"Match {i}:\n")
-                f.write(f"  Date: {match['date']} ({match['day_of_week']})\n")
-                f.write(f"  Time: {match['time']}\n")
-                f.write(f"  Level: {match['level_range']}\n")
-                f.write(f"  Type: {match['type']}\n")
-                if match.get("link"):
-                    f.write(f"  Link: {match['link']}\n")
-                f.write("-" * 50 + "\n")
+        for i, match in enumerate(matches, 1):
+            print(f"Match {i}:")
+            print(f"  Date: {match['date']} ({match['day_of_week']})")
+            print(f"  Time: {match['time']}")
+            print(f"  Level: {match['level_range']}")
+            print(f"  Type: {match['type']}")
+            if match.get("link"):
+                print(f"  Link: {match['link']}")
+            print("-" * 50)
 
-        print(f"Results written to: {filename}")
+        print(f"\nTotal matches printed: {len(matches)}")
 
     def output_summary_for_github_actions(
         self, all_matches: List[Dict], filtered_matches: List[Dict], sorted_matches: List[Dict]
@@ -507,10 +501,10 @@ class StratfordPadelMatchScraper:
         sorted_matches = self.sort_matches_by_date(matches_with_dates)
 
         # Write to file
-        self.write_matches_to_file(sorted_matches)
+        self.print_matches(sorted_matches)
 
-        # Output summary for GitHub Actions
-        self.output_summary_for_github_actions(all_matches, time_filtered_matches, sorted_matches)
+        # # Output summary for GitHub Actions
+        # self.output_summary_for_github_actions(all_matches, time_filtered_matches, sorted_matches)
 
         # Print summary to console
         print(f"\n{'='*80}")
