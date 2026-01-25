@@ -116,7 +116,7 @@ if st.button("Run scraper", type="primary"):
             str(weeks),
             "--weekdays",
             json.dumps(weekday_cfg),
-            "--weekend-times",
+            "--weekends",
             json.dumps(weekend_cfg),
             "--verbose",
         ]
