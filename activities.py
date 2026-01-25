@@ -72,10 +72,21 @@ class StratfordPadelActivityScraper:
             print(f"❌ Failed to fetch {date}: {e}")
             return None
 
-    def parse_sessions(self, html: str) -> List[Dict]:
-        soup = BeautifulSoup(html, "html.parser")
+    def parse_activity_sessions(self, html_content: str) -> List[Dict]:
+        """
+        Parse HTML content to extract activity sessions with sign-up links, instructor,
+        vacancies, court, levels, and properly formatted date/time.
+
+        Args:
+            html_content: Raw HTML content from the booking page
+
+        Returns:
+            List of dictionaries containing session details
+        """
+        soup = BeautifulSoup(html_content, "html.parser")
         sessions = []
 
+        # Each session is in a div with class "contenedor2Columnas2"
         containers = soup.find_all("div", class_="contenedor2Columnas2")
         print(f"Found {len(containers)} containers")
 
@@ -86,28 +97,25 @@ class StratfordPadelActivityScraper:
             title_span = c.find("span", class_="textoTituloPubli2")
             if not title_span:
                 continue
-
             title = title_span.get_text(strip=True)
 
-            # Exact keyword filtering (case-sensitive)
+            # Keyword filtering (exact match)
             if self.config.get("keywords"):
                 if not any(k in title for k in self.config["keywords"]):
                     continue
 
             # -------------------------
-            # Date & time
+            # Date & Time
             # -------------------------
             datetime_span = c.find("span", id=lambda x: x and "LabelHorarioValor" in x)
             if not datetime_span:
                 continue
-
             m = re.search(
                 r"(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2})-(\d{2}:\d{2})",
                 datetime_span.get_text(strip=True),
             )
             if not m:
                 continue
-
             date_str, start_time, end_time = m.groups()
             date_obj = datetime.strptime(date_str, "%d/%m/%Y")
             day_name = date_obj.strftime("%A")
@@ -115,12 +123,9 @@ class StratfordPadelActivityScraper:
             # -------------------------
             # Time filter
             # -------------------------
-            cfg = self.config["time_filters"].get(day_name.lower())
+            cfg = self.config.get("time_filters", {}).get(day_name.lower())
             hour = int(start_time.split(":")[0])
-
-            if not cfg or not cfg["enabled"]:
-                continue
-            if not (cfg["start_hour"] <= hour <= cfg["end_hour"]):
+            if cfg and cfg.get("enabled") and not (cfg["start_hour"] <= hour <= cfg["end_hour"]):
                 continue
 
             # -------------------------
@@ -140,7 +145,7 @@ class StratfordPadelActivityScraper:
                 vacancies = vacancies_span.get_text(strip=True)
 
             # -------------------------
-            # Court / location
+            # Court / Location
             # -------------------------
             court = None
             court_span = c.find("span", id=lambda x: x and "LabelUbicacion" in x)
@@ -148,7 +153,7 @@ class StratfordPadelActivityScraper:
                 court = court_span.get_text(strip=True)
 
             # -------------------------
-            # Levels (NEW)
+            # Levels
             # -------------------------
             levels = None
             levels_span = c.find("span", id=lambda x: x and "LabelNiveles" in x)
@@ -156,7 +161,7 @@ class StratfordPadelActivityScraper:
                 levels = levels_span.get_text(strip=True)
 
             # -------------------------
-            # Signup link
+            # Sign-up link
             # -------------------------
             link = None
             link_tag = c.find("a", class_="boton")
@@ -173,7 +178,7 @@ class StratfordPadelActivityScraper:
                 continue
 
             # -------------------------
-            # Final session
+            # Add session
             # -------------------------
             sessions.append(
                 {
@@ -206,12 +211,13 @@ class StratfordPadelActivityScraper:
             if not html:
                 continue
 
-            day_sessions = self.parse_sessions(html)
+            day_sessions = self.parse_activity_sessions(html)
             print(f"→ {len(day_sessions)} valid sessions found")
 
             results.extend(day_sessions)
 
         print(f"✅ Total activities collected: {len(results)}")
+        print(results)
         return results
 
 
