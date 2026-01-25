@@ -551,5 +551,6 @@ def main():
 
         scraper.search_for_matches()
 
-    if __name__ == "__main__":
-        app()
+
+if __name__ == "__main__":
+    main()
