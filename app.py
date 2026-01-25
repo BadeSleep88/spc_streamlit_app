@@ -105,11 +105,29 @@ with tab_activities:
     # -------------------------
     # Search controls
     # -------------------------
-    days_ahead = st.slider("Days ahead", 1, 30, 7)
+    days_ahead = st.slider("Days ahead", 1, 42, 7)
 
     st.subheader("🎾 Activity types")
 
     ACTIVITY_OPTIONS = [
+        "Train and Play Green",
+        "Train and Play Blue",
+        "Train and Play Orange",
+        "Train and Play Yellow",
+        "Padel Academy Green",
+        "Padel Academy Orange",
+        "Padel Academy Blue",
+        "Padel Academy Yellow",
+        "Ball machine training",
+        "Private Class",
+        "PadelConnect Intermediates",
+        "PadelConnect Beginners",
+        "PadelConnect Improvers",
+        "PadelConnect Advanced",
+        "Matchplay with coach",
+    ]
+
+    DEFAULT_OPTIONS = [
         "Train and Play Green",
         "Padel Academy Green",
         "Private Class",
@@ -119,7 +137,7 @@ with tab_activities:
     selected_activities = st.multiselect(
         "Select activities",
         options=ACTIVITY_OPTIONS,
-        default=ACTIVITY_OPTIONS,
+        default=DEFAULT_OPTIONS,
     )
 
     st.subheader("⏰ Time filters")
@@ -197,10 +215,12 @@ with tab_activities:
                             <b>{a['title']}</b><br>
                             📅 {a['date']} ({a['day_name']})<br>
                             ⏰ {a['time']}<br>
+                            👤 <b>Instructor:</b> {a.get('instructor', 'N/A')}<br>
+                            🎟️ <b>Vacancies:</b> {a.get('vacancies', 'N/A')}<br>
                             <a href="{a['link']}"
-                               target="_blank"
-                               style="color:#4FC3F7;font-weight:bold">
-                               🔗 Open booking
+                            target="_blank"
+                            style="color:#4FC3F7;font-weight:bold">
+                            🔗 Open booking
                             </a>
                         </div>
                         """,
