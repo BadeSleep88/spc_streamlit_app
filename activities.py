@@ -57,7 +57,7 @@ class StratfordPadelActivityScraper:
     def get_date_range(self) -> List[str]:
         dates = []
         today = datetime.now()
-        for i in range(self.days_to_search):
+        for i in range(self.config["search_settings"]["days_to_search"]):
             dates.append((today + timedelta(days=i)).strftime("%d-%m-%Y"))
         return dates
 
@@ -80,7 +80,7 @@ class StratfordPadelActivityScraper:
             if not title_span:
                 continue
             activity_name = title_span.get_text().strip()
-            if not any(name in activity_name for name in self.activity_names):
+            if not any(name in activity_name for name in self.config["activity_search"]["activity_name"]):
                 continue
 
             # Extract session info
@@ -163,7 +163,7 @@ class StratfordPadelActivityScraper:
 
     def print_sessions(self, sessions: List[Dict]):
         print("=" * 50)
-        print(f"Searching activities: {', '.join(self.activity_names)}")
+        print(f"Searching activities: {', '.join(self.config["activity_search"]["activity_name"])}")
         print(f"Generated on: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
         print(f"Total sessions: {len(sessions)}")
         print("=" * 50)
