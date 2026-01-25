@@ -43,21 +43,21 @@ def day_block(label, default_start, default_end):
     enabled = st.checkbox(label, value=True)
     if not enabled:
         return {"enabled": False}
-    start, end = st.slider(f"{label} time window", 0, 23, (default_start, default_end))
+    start, end = st.slider(f"{label} time window", 8, 22, (default_start, default_end))
     return {"enabled": True, "start_hour": start, "end_hour": end}
 
 
 weekday_cfg = {
-    "monday": day_block("Monday", 19, 23),
-    "tuesday": day_block("Tuesday", 18, 23),
-    "wednesday": day_block("Wednesday", 19, 23),
-    "thursday": day_block("Thursday", 19, 23),
-    "friday": day_block("Friday", 18, 23),
+    "monday": day_block("Monday", 8, 22),
+    "tuesday": day_block("Tuesday", 8, 22),
+    "wednesday": day_block("Wednesday", 8, 22),
+    "thursday": day_block("Thursday", 8, 22),
+    "friday": day_block("Friday", 8, 22),
 }
 
 weekend_cfg = {
-    "saturday": day_block("Saturday", 9, 22),
-    "sunday": day_block("Sunday", 9, 22),
+    "saturday": day_block("Saturday", 8, 22),
+    "sunday": day_block("Sunday", 8, 22),
 }
 
 st.divider()
