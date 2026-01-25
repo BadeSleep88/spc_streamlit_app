@@ -110,7 +110,7 @@ with tab_games:
                     <div class="full-width-card">
                         <b>📅 {m['date']} ({m['day_of_week']})</b><br>
                         ⏰ {m['time']}<br>
-                        {"🎯 <b>Level Range:</b> " + a["level_range"] + "<br>" if a.get("level_range") else ""}
+                        {"🎯 <b>Level Range:</b> " + m["level_range"] + "<br>" if m.get("level_range") else ""}
 
                         🎯 {m['level_range']}<br>
                         <a href="{m['link'].replace('Match.aspx','Share.aspx')}" 
