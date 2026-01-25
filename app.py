@@ -9,12 +9,12 @@ from scraper import StratfordPadelMatchScraper  # Import your scraper class
 # Page config
 # --------------------
 st.set_page_config(
-    page_title="Stratford Padel Match Finder",
+    page_title="SPC Padel Match Finder",
     page_icon="🎾",
     layout="wide",
 )
 
-st.title("🎾 Stratford Padel Match Finder")
+st.title("🎾 SPC Padel Match Finder")
 st.caption("Private tool · Compact & Visual Layout")
 
 st.divider()
