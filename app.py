@@ -179,6 +179,7 @@ with tab_activities:
         scraper.config["time_filters"]["weekdays"] = weekdays
         scraper.config["time_filters"]["weekends"] = weekends
         scraper.config["activity_search"]["activity_name"] = {"activity_name": list(keywords)}
+        print(scraper.config)
         return scraper.search_for_sessions()  # Updated method that returns filtered + sorted sessions
 
     # -------------------------
