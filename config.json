@@ -25,40 +25,15 @@
   },
   "time_filters": {
     "weekends": {
-      "enabled": true,
-      "description": "All day (no time restrictions)"
+      "saturday": {"enabled": true, "start_hour": 10, "end_hour": 22, "description": "10am-10pm"},
+      "sunday": {"enabled": true, "start_hour": 12, "end_hour": 20, "description": "12pm-8pm"}
     },
     "weekdays": {
-      "tuesday": {
-        "enabled": true,
-        "start_hour": 12,
-        "end_hour": 23,
-        "description": "12-11pm"
-      },
-      "friday": {
-        "enabled": true,
-        "start_hour": 12,
-        "end_hour": 23,
-        "description": "12-11pm"
-      },
-      "monday": {
-        "enabled": true,
-        "start_hour": 12,
-        "end_hour": 23,
-        "description": "12-11pm"
-      },
-      "wednesday": {
-        "enabled": true,
-        "start_hour": 12,
-        "end_hour": 23,
-        "description": "12-11pm"
-      },
-      "thursday": {
-        "enabled": true,
-        "start_hour": 12,
-        "end_hour": 23,
-        "description": "12-11pm"
-      }
+      "monday": {"enabled": true, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
+      "tuesday": {"enabled": true, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
+      "wednesday": {"enabled": true, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
+      "thursday": {"enabled": true, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
+      "friday": {"enabled": true, "start_hour": 12, "end_hour": 23, "description": "12-11pm"}
     }
   },
   "url_parameters": {

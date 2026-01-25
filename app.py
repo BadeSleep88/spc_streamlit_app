@@ -1,5 +1,6 @@
 import json
 import subprocess
+
 import streamlit as st
 
 # --------------------
@@ -108,8 +109,10 @@ st.subheader("🚀 Run search")
 
 if st.button("Run scraper", type="primary"):
     with st.spinner("Searching for matches..."):
+        import sys
+
         cmd = [
-            "python",
+            sys.executable,  # use Streamlit's Python
             "scraper.py",
             "run",
             "--level-min",

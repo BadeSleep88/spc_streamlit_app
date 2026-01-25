@@ -272,31 +272,21 @@ class StratfordPadelMatchScraper:
             day_name = match["day_name"].lower()
             time_str = match["time"]
 
-            # Parse time to get hour
             try:
                 hour = int(time_str.split(":")[0])
 
-                # Check if it's a weekend (Saturday or Sunday)
-                is_weekend = day_name in ["saturday", "sunday"]
-
-                # Apply time filter based on configuration
-                if is_weekend:
-                    # Weekends: Check if enabled in config
-                    if time_filters["weekends"]["enabled"]:
+                # Weekdays
+                if day_name in time_filters["weekdays"]:
+                    cfg = time_filters["weekdays"][day_name]
+                    if cfg["enabled"] and cfg["start_hour"] <= hour <= cfg["end_hour"]:
                         filtered_matches.append(match)
-                else:
-                    # Weekdays: Check specific day configuration
-                    if day_name in time_filters["weekdays"]:
-                        day_config = time_filters["weekdays"][day_name]
-                        if day_config["enabled"]:
-                            start_hour = day_config["start_hour"]
-                            end_hour = day_config["end_hour"]
-                            if start_hour <= hour <= end_hour:
-                                filtered_matches.append(match)
+                # Weekends now handled separately per day
+                elif day_name in time_filters["weekends"]:
+                    cfg = time_filters["weekends"][day_name]
+                    if cfg["enabled"] and cfg["start_hour"] <= hour <= cfg["end_hour"]:
+                        filtered_matches.append(match)
 
-            except (ValueError, IndexError) as e:
-                if self.config["debug_settings"]["verbose_logging"]:
-                    print(f"Error parsing time for match: {match}")
+            except (ValueError, IndexError):
                 continue
 
         return filtered_matches
@@ -533,41 +523,32 @@ class StratfordPadelMatchScraper:
 
 
 def main():
-    import json
     import typer
 
     app = typer.Typer(help="Stratford Padel Club Match Finder")
 
     @app.command()
     def run(
-        level_min: float = typer.Option(None, help="Minimum player level"),
-        level_max: float = typer.Option(None, help="Maximum player level"),
-        weeks: int = typer.Option(None, help="Weeks to search"),
-        weekdays: str = typer.Option(None, help="Weekday config as JSON string"),
-        weekend_times: str = typer.Option(None, help="Weekend time window JSON (start_hour/end_hour)"),
-        verbose: bool = typer.Option(False, help="Verbose logging"),
-        save_html: bool = typer.Option(False, help="Save raw HTML"),
+        level_min: float = typer.Option(None),
+        level_max: float = typer.Option(None),
+        weeks: int = typer.Option(None),
+        weekdays: str = typer.Option(None, help="Weekday config JSON"),
+        weekends: str = typer.Option(None, help="Weekend config JSON"),
+        verbose: bool = typer.Option(False),
+        save_html: bool = typer.Option(False),
     ):
         scraper = StratfordPadelMatchScraper()
 
-        # ---- Search overrides ----
         if level_min is not None:
             scraper.config["search_settings"]["level_range"]["min"] = level_min
         if level_max is not None:
             scraper.config["search_settings"]["level_range"]["max"] = level_max
         if weeks is not None:
             scraper.config["search_settings"]["weeks_to_search"] = weeks
-
-        # ---- Time filters ----
         if weekdays:
             scraper.config["time_filters"]["weekdays"] = json.loads(weekdays)
-
-        # Weekends always enabled — only override hours
-        if weekend_times:
-            weekend_cfg = json.loads(weekend_times)
-            scraper.config["time_filters"]["weekends"].update(weekend_cfg)
-
-        # ---- Debug ----
+        if weekends:
+            scraper.config["time_filters"]["weekends"] = json.loads(weekends)
         if verbose:
             scraper.config["debug_settings"]["verbose_logging"] = True
         if save_html:
