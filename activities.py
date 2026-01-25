@@ -149,7 +149,7 @@ class StratfordPadelActivityScraper:
     # -------------------------
     # Main entry
     # -------------------------
-    def search(self=None) -> List[Dict]:
+    def search(self) -> List[Dict]:
         print("🚀 Starting activity search")
 
         results = []
