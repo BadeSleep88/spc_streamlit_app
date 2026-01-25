@@ -131,8 +131,8 @@ with tab_activities:
 
         start, end = st.slider(
             f"{label} time",
-            6,
-            23,
+            8,
+            22,
             (default_start, default_end),
             key=f"s_{label}",
         )
@@ -144,13 +144,13 @@ with tab_activities:
         }
 
     time_filters = {
-        "monday": activity_day("Monday", 18, 22),
-        "tuesday": activity_day("Tuesday", 18, 22),
-        "wednesday": activity_day("Wednesday", 18, 22),
-        "thursday": activity_day("Thursday", 18, 22),
-        "friday": activity_day("Friday", 18, 22),
-        "saturday": activity_day("Saturday", 10, 22),
-        "sunday": activity_day("Sunday", 12, 20),
+        "monday": activity_day("Monday", 8, 22),
+        "tuesday": activity_day("Tuesday", 8, 22),
+        "wednesday": activity_day("Wednesday", 8, 22),
+        "thursday": activity_day("Thursday", 8, 22),
+        "friday": activity_day("Friday", 8, 22),
+        "saturday": activity_day("Saturday", 8, 22),
+        "sunday": activity_day("Sunday", 8, 22),
     }
 
     # -------------------------
@@ -162,7 +162,8 @@ with tab_activities:
         scraper.config["days_ahead"] = days_ahead
         scraper.config["time_filters"] = time_filters
         scraper.config["keywords"] = keywords
-        return scraper.search()
+        print(scraper.config)
+        return scraper.search(), scraper.config
 
     # -------------------------
     # Run search
@@ -172,14 +173,14 @@ with tab_activities:
             st.warning("Please select at least one activity type.")
         else:
             with st.spinner("Searching activities..."):
-                activities = run_activity_search(
+                activities, config = run_activity_search(
                     days_ahead,
                     time_filters,
                     tuple(selected_activities),  # cache-safe
                 )
 
             if not activities:
-                st.info("No activities found for the selected filters.")
+                st.info("No activities found for the selected filters.", config)
             else:
                 st.success(f"Found {len(activities)} activities")
 
