@@ -16,6 +16,8 @@ except ImportError as e:
     print("pip install requests beautifulsoup4 lxml")
     sys.exit(1)
 
+print("Search Initiated")
+
 
 class StratfordPadelMatchScraper:
     def __init__(self, config_file: str = "config.json"):
