@@ -16,8 +16,13 @@ st.set_page_config(
 
 st.title("🎾 SPC Padel Match Finder")
 st.caption("Private tool")
-
 st.divider()
+
+# --------------------
+# Session state for tracking running search
+# --------------------
+if "search_running" not in st.session_state:
+    st.session_state.search_running = False
 
 # --------------------
 # Search settings
@@ -64,7 +69,32 @@ st.divider()
 
 
 # --------------------
-# Function to display matches in a 2-column grid
+# Cached scraper
+# --------------------
+@st.cache_data(show_spinner=False)
+def cached_scraper(level_min, level_max, weeks, weekday_cfg, weekend_cfg):
+    scraper = StratfordPadelMatchScraper()
+    scraper.config["search_settings"]["level_range"]["min"] = level_min
+    scraper.config["search_settings"]["level_range"]["max"] = level_max
+    scraper.config["search_settings"]["weeks_to_search"] = weeks
+    scraper.config["time_filters"]["weekdays"] = weekday_cfg
+    scraper.config["time_filters"]["weekends"] = weekend_cfg
+    scraper.config["debug_settings"]["verbose_logging"] = False
+    scraper.config["debug_settings"]["save_raw_html"] = False
+
+    all_matches = []
+    for start_date, end_date in scraper.get_week_ranges():
+        html = scraper.fetch_matches_page(start_date, end_date)
+        week_matches = scraper.parse_matches(html)
+        all_matches.extend(week_matches)
+
+    filtered_matches = scraper.filter_matches_by_time(all_matches)
+    matches_with_dates = scraper.add_date_info(filtered_matches)
+    return matches_with_dates
+
+
+# --------------------
+# Display matches
 # --------------------
 def display_matches_grid(matches):
     if not matches:
@@ -74,7 +104,6 @@ def display_matches_grid(matches):
     st.markdown(f"### 🎾 Total matches: {len(matches)}")
     st.divider()
 
-    # Two-column grid
     num_cols = 2
     for i in range(0, len(matches), num_cols):
         cols = st.columns(num_cols)
@@ -93,7 +122,7 @@ def display_matches_grid(matches):
                         <p style='margin:2px'>Time: {match['time']}</p>
                         <p style='margin:2px'>Level: {match['level_range']}</p>
                         <p style='margin:2px'>Type: {match['type']}</p>
-                        {"<p style='margin:2px'><a href=\"" + match['link'].replace("Match.aspx", "Share.aspx") + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
+                        {"<p style='margin:2px'><a href=\"" + match['link'].replace('Match.aspx','Share.aspx') + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -101,33 +130,17 @@ def display_matches_grid(matches):
 
 
 # --------------------
-# Run scraper
+# Run search button
 # --------------------
 st.subheader("🚀 Run search")
 
-if st.button("Search Matches", type="primary"):
-    with st.spinner("Searching for matches..."):
-        scraper = StratfordPadelMatchScraper()
-        # Apply Streamlit settings
-        scraper.config["search_settings"]["level_range"]["min"] = level_min
-        scraper.config["search_settings"]["level_range"]["max"] = level_max
-        scraper.config["search_settings"]["weeks_to_search"] = weeks
-        scraper.config["time_filters"]["weekdays"] = weekday_cfg
-        scraper.config["time_filters"]["weekends"] = weekend_cfg
-        scraper.config["debug_settings"]["verbose_logging"] = True
-        scraper.config["debug_settings"]["save_raw_html"] = False
-
-        # Get matches
-        all_matches = []
-        for start_date, end_date in scraper.get_week_ranges():
-            html = scraper.fetch_matches_page(start_date, end_date)
-            week_matches = scraper.parse_matches(html)
-            all_matches.extend(week_matches)
-
-        filtered_matches = scraper.filter_matches_by_time(all_matches)
-        matches_with_dates = scraper.add_date_info(filtered_matches)
-
-        # Display matches
-        display_matches_grid(matches_with_dates)
-
-    st.success("Search complete")
+if st.session_state.search_running:
+    st.info("A search is already running... please wait 🕐")
+else:
+    if st.button("Search Matches", type="primary"):
+        st.session_state.search_running = True
+        with st.spinner("Searching for matches..."):
+            results = cached_scraper(level_min, level_max, weeks, weekday_cfg, weekend_cfg)
+        display_matches_grid(results)
+        st.session_state.search_running = False
+        st.success("Search complete ✅")
