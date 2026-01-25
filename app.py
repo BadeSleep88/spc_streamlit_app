@@ -145,10 +145,9 @@ with tab_activities:
         "Matchplay with coach",
     ]
     DEFAULT_OPTIONS = [
+        "Private Class",
         "Train and Play Green",
         "Padel Academy Green",
-        "Private Class",
-        "PadelConnect Intermediates",
     ]
 
     selected_activities = st.multiselect(
