@@ -41,6 +41,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+def line(icon, label, value):
+    if value not in [None, "", " "]:
+        return f"{icon} <b>{label}:</b> {value}<br>"
+    return ""
+
+
 st.title("🎾 SPC Finder")
 st.caption("Private tool")
 st.divider()
@@ -109,14 +116,16 @@ with tab_games:
                     f"""
                     <div class="full-width-card">
                         <b>📅 {m['date']} ({m['day_of_week']})</b><br>
-                        {"⏰ <b>Start Time:</b> " + m["time"] + "<br>" if m.get("time") else ""}
-                        {"🎯 <b>Level Range:</b> " + m["level_range"] + "<br>" if m.get("level_range") else ""}
+                        {line("⏰", "Start Time", m.get("time"))}
+                        {line("👤", "Level Range", m.get("level_range"))}
+
                         <a href="{m['link'].replace('Match.aspx','Share.aspx')}" 
                            style="color:#1E90FF" target="_blank">🔗 Open booking</a>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
+
 # =====================================================
 # 🏃 FIND ACTIVITIES TAB
 # =====================================================
@@ -198,11 +207,15 @@ with tab_activities:
                         <div class="full-width-card">
                             <b>{a['type']}</b><br>
                             📅 {a['date']} ({a['day_of_week']})<br>
-                            {"⏰ <b>Time:</b> " + a["time"] + "<br>" if a.get("time") else ""}
-                            {"👤 <b>Instructor:</b> " + a["instructor"] + "<br>" if a.get("instructor") else ""}
-                            {"🎟️ <b>Vacancies:</b> " + str(a["vacancies"]) + "<br>" if a.get("vacancies") is not None else ""}
-                            {"📍 <b>Court:</b> " + a["court"] + "<br>" if a.get("court") else ""}
-                            <a href="{a['sign_up_link'].replace('Info.aspx','Share.aspx')}" target="_blank" style="color:#4FC3F7;font-weight:bold">
+
+                            {line("⏰", "Time", a.get("time"))}
+                            {line("👤", "Instructor", a.get("instructor"))}
+                            {line("🎟️", "Vacancies", a.get("vacancies"))}
+                            {line("📍", "Court", a.get("court"))}
+
+                            <a href="{a['sign_up_link'].replace('Info.aspx','Share.aspx')}"
+                            target="_blank"
+                            style="color:#4FC3F7;font-weight:bold">
                             🔗 Open booking
                             </a>
                         </div>
