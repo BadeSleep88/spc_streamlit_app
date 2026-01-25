@@ -523,10 +523,11 @@ def main():
 
     import typer
 
-    app = typer.Typer(help="Stratford Padel Club Match Finder")
+    # Allow the callback to run directly when no command is provided
+    app = typer.Typer(invoke_without_command=True)
     print("CALLBACKCLI")  # just to see main() is called
 
-    @app.callback()
+    @app.callback(invoke_without_command=True)
     def cli(
         level_min: float = typer.Option(None, help="Minimum player level"),
         level_max: float = typer.Option(None, help="Maximum player level"),
@@ -554,8 +555,8 @@ def main():
         scraper.config["debug_settings"]["save_raw_html"] = False
         scraper.search_for_matches()
 
-    # <--- THIS LINE IS MISSING IN YOUR CURRENT CODE
-    app()  # actually runs the Typer CLI
+    # This actually runs the Typer CLI
+    app()
 
 
 if __name__ == "__main__":
