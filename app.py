@@ -112,7 +112,7 @@ with tab_games:
                         {"⏰ <b>Start Time:</b> " + m["time"] + "<br>" if m.get("time") else ""}
                         {"🎯 <b>Level Range:</b> " + m["level_range"] + "<br>" if m.get("level_range") else ""}
                         <a href="{m['link'].replace('Match.aspx','Share.aspx')}" 
-                           style="color:#1E90FF" target="_blank">🔗 Open</a>
+                           style="color:#1E90FF" target="_blank">🔗 Open booking</a>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -199,7 +199,7 @@ with tab_activities:
                         <div class="full-width-card">
                             <b>{a['type']}</b><br>
                             📅 {a['date']} ({a['day_of_week']})<br>
-                            ⏰ {a['time']}<br>
+                            {"⏰ <b>Start Time:</b> " + m["time"] + "<br>" if m.get("time") else ""}
                             {"👤 <b>Instructor:</b> " + a["instructor"] + "<br>" if a.get("instructor") else ""}
                             {"🎟️ <b>Vacancies:</b> " + str(a["vacancies"]) + "<br>" if a.get("vacancies") is not None else ""}
                             {"📍 <b>Court:</b> " + a["court"] + "<br>" if a.get("court") else ""}
