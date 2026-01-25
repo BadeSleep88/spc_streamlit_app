@@ -134,7 +134,7 @@ with tab_games:
 with tab_activities:
     st.subheader("Find Activities")
 
-    days_ahead = st.slider("Days ahead", 1, 42, 7, key="a_days_ahead")
+    days_ahead = st.slider("Days to search ahead", 1, 42, 7, key="a_days_ahead")
 
     st.subheader("🎾 Activity types")
 
