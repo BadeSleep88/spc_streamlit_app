@@ -71,7 +71,7 @@ st.divider()
 # --------------------
 # Cached scraper
 # --------------------
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def cached_scraper(level_min, level_max, weeks, weekday_cfg, weekend_cfg):
     scraper = StratfordPadelMatchScraper()
     scraper.config["search_settings"]["level_range"]["min"] = level_min
