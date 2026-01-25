@@ -88,9 +88,6 @@ weekday_cfg = {
     "friday": day_block("Friday", 18, 23),
 }
 
-# Weekends now separate days
-st.markdown("### Weekends")
-
 weekend_cfg = {
     "saturday": day_block("Saturday", 9, 22),
     "sunday": day_block("Sunday", 9, 22),
