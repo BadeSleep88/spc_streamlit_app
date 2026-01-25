@@ -108,8 +108,10 @@ with tab_games:
                 st.markdown(
                     f"""
                     <div class="full-width-card">
-                        <b>{m['date']} ({m['day_of_week']})</b><br>
+                        <b>📅 {m['date']} ({m['day_of_week']})</b><br>
                         ⏰ {m['time']}<br>
+                        {"🎯 <b>Level Range:</b> " + a["level_range"] + "<br>" if a.get("level_range") else ""}
+
                         🎯 {m['level_range']}<br>
                         <a href="{m['link'].replace('Match.aspx','Share.aspx')}" 
                            style="color:#1E90FF" target="_blank">🔗 Open</a>
@@ -117,7 +119,6 @@ with tab_games:
                     """,
                     unsafe_allow_html=True,
                 )
-
 # =====================================================
 # 🏃 FIND ACTIVITIES TAB
 # =====================================================
