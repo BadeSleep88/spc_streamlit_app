@@ -93,7 +93,7 @@ def display_matches_grid(matches):
                         <p style='margin:2px'>Time: {match['time']}</p>
                         <p style='margin:2px'>Level: {match['level_range']}</p>
                         <p style='margin:2px'>Type: {match['type']}</p>
-                        {"<p style='margin:2px'><a href=\"" + match['link'] + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
+                        {"<p style='margin:2px'><a href=\"" + match['link'].replace("Match.aspx", "Share.aspx") + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
                     </div>
                     """,
                     unsafe_allow_html=True,
