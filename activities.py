@@ -1,246 +1,239 @@
+import json
 import re
+import sys
+import time
 from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import requests
+import typer
 from bs4 import BeautifulSoup
+
+print("Search Initiated")
 
 
 class StratfordPadelActivityScraper:
-    def __init__(self):
+    def __init__(self, config_file: str = "config.json"):
         self.base_url = "https://stratfordpadelclub.matchpoint.com.es/ActBooking/Agenda.aspx"
-        self.headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-
-        # Runtime-configurable (set by Streamlit)
-        self.config = {
-            "days_ahead": 5,
-            "time_filters": {
-                "saturday": {
-                    "enabled": True,
-                    "start_hour": 10,
-                    "end_hour": 22,
-                    "description": "10am-10pm",
-                },
-                "sunday": {"enabled": True, "start_hour": 12, "end_hour": 20, "description": "12pm-8pm"},
-                "monday": {"enabled": True, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
-                "tuesday": {"enabled": True, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
-                "wednesday": {
-                    "enabled": True,
-                    "start_hour": 12,
-                    "end_hour": 23,
-                    "description": "12-11pm",
-                },
-                "thursday": {"enabled": True, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
-                "friday": {"enabled": True, "start_hour": 12, "end_hour": 23, "description": "12-11pm"},
-            },
-            "keywords": [
-                "Train and Play Green",
-                "Padel Academy Green",
-                "Private Class",
-                "PadelConnect Intermediates",
-            ],
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
 
-    # -------------------------
-    # Helpers
-    # -------------------------
+        # Load configuration
+        self.config = self.load_config(config_file)
+        print("Activity scraper initialized successfully!")
 
-    def get_dates(self) -> List[str]:
+        # Parse activity names from config
+        activity_name_config = self.config.get("activity_search", {}).get(
+            "activity_name", "Train and Play Orange"
+        )
+        self.activity_names = (
+            activity_name_config if isinstance(activity_name_config, list) else [activity_name_config]
+        )
+
+        # Days to search
+        self.days_to_search = self.config.get("activity_search", {}).get("days_to_search", 45)
+
+        # Output files
+        self.output_filename = self.config.get("activity_search", {}).get(
+            "output_filename", "activity_sessions.txt"
+        )
+        self.all_sessions_filename = "all_activity_sessions.txt"
+
+    def load_config(self, config_file: str) -> Dict:
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            print(f"Configuration loaded from {config_file}")
+            return config
+        except (FileNotFoundError, json.JSONDecodeError):
+            print(f"Using default configuration")
+            return self.default_config()
+
+    def default_config(self) -> Dict:
+        return {
+            "activity_search": {
+                "activity_name": ["Train and Play Orange"],
+                "days_to_search": 45,
+                "output_filename": "activity_sessions.txt",
+            },
+            "time_filters": {
+                "weekdays": {
+                    "monday": {"enabled": True, "start_hour": 18, "end_hour": 23},
+                    "tuesday": {"enabled": True, "start_hour": 18, "end_hour": 23},
+                    "wednesday": {"enabled": True, "start_hour": 18, "end_hour": 23},
+                    "thursday": {"enabled": True, "start_hour": 18, "end_hour": 23},
+                    "friday": {"enabled": True, "start_hour": 18, "end_hour": 23},
+                },
+                "weekends": {"enabled": True, "start_hour": 0, "end_hour": 23},
+            },
+            "debug_settings": {"verbose_logging": True},
+        }
+
+    def get_date_range(self) -> List[str]:
         dates = []
         today = datetime.now()
-        for i in range(self.config["days_ahead"]):
-            d = today + timedelta(days=i)
-            dates.append(d.strftime("%d-%m-%Y"))
+        for i in range(self.days_to_search):
+            dates.append((today + timedelta(days=i)).strftime("%d-%m-%Y"))
         return dates
 
-    # -------------------------
-    # Fetch
-    # -------------------------
-    def fetch_day(self, date: str = None) -> Optional[str]:
-        print(f"Fetching agenda for {date}")
-
+    def fetch_booking_page(self, date: str) -> Optional[str]:
         try:
-            r = requests.get(
-                self.base_url,
-                params={"d": date, "m": ""},
-                headers=self.headers,
-                timeout=10,
-            )
-            r.raise_for_status()
-            return r.text
-        except Exception as e:
-            print(f"❌ Failed to fetch {date}: {e}")
+            response = requests.get(self.base_url, params={"d": date}, headers=self.headers, timeout=10)
+            response.raise_for_status()
+            return response.text
+        except requests.RequestException as e:
+            print(f"Error fetching page for {date}: {e}")
             return None
 
-    def parse_activity_sessions(self, html_content: str) -> List[Dict]:
-        """
-        Parse HTML content to extract activity sessions with sign-up links, instructor,
-        vacancies, court, levels, and properly formatted date/time.
-
-        Args:
-            html_content: Raw HTML content from the booking page
-
-        Returns:
-            List of dictionaries containing session details
-        """
-        soup = BeautifulSoup(html_content, "html.parser")
+    def parse_activity_sessions(self, html: str) -> List[Dict]:
+        soup = BeautifulSoup(html, "html.parser")
         sessions = []
-
-        # Each session is in a div with class "contenedor2Columnas2"
         containers = soup.find_all("div", class_="contenedor2Columnas2")
-        print(f"Found {len(containers)} containers")
 
-        for c in containers:
-            # -------------------------
-            # Title
-            # -------------------------
-            title_span = c.find("span", class_="textoTituloPubli2")
+        for container in containers:
+            title_span = container.find("span", class_="textoTituloPubli2")
             if not title_span:
                 continue
-            title = title_span.get_text(strip=True)
-
-            # Keyword filtering (exact match)
-            if self.config.get("keywords"):
-                if not any(k in title for k in self.config["keywords"]):
-                    continue
-
-            # -------------------------
-            # Date & Time
-            # -------------------------
-            datetime_span = c.find("span", id=lambda x: x and "LabelHorarioValor" in x)
-            if not datetime_span:
-                continue
-            m = re.search(
-                r"(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2})-(\d{2}:\d{2})",
-                datetime_span.get_text(strip=True),
-            )
-            if not m:
-                continue
-            date_str, start_time, end_time = m.groups()
-            date_obj = datetime.strptime(date_str, "%d/%m/%Y")
-            day_name = date_obj.strftime("%A")
-
-            # -------------------------
-            # Time filter
-            # -------------------------
-            cfg = self.config.get("time_filters", {}).get(day_name.lower())
-            hour = int(start_time.split(":")[0])
-            if cfg and cfg.get("enabled") and not (cfg["start_hour"] <= hour <= cfg["end_hour"]):
+            activity_name = title_span.get_text().strip()
+            if not any(name in activity_name for name in self.activity_names):
                 continue
 
-            # -------------------------
-            # Instructor
-            # -------------------------
-            instructor = "N/A"
-            instructor_span = c.find("span", id=lambda x: x and "LabelProfesor" in x)
-            if instructor_span:
-                instructor = instructor_span.get_text(strip=True)
+            # Extract session info
+            info = self.extract_session_info(container)
+            if not info:
+                continue
 
-            # -------------------------
-            # Vacancies
-            # -------------------------
-            vacancies = "N/A"
-            vacancies_span = c.find("span", id=lambda x: x and "LabelPlazasDisponibles" in x)
-            if vacancies_span:
-                vacancies = vacancies_span.get_text(strip=True)
-
-            # -------------------------
-            # Court / Location
-            # -------------------------
-            court = None
-            court_span = c.find("span", id=lambda x: x and "LabelUbicacion" in x)
-            if court_span:
-                court = court_span.get_text(strip=True)
-
-            # -------------------------
-            # Levels
-            # -------------------------
-            levels = None
-            levels_span = c.find("span", id=lambda x: x and "LabelNiveles" in x)
-            if levels_span:
-                levels = levels_span.get_text(strip=True)
-
-            # -------------------------
-            # Sign-up link
-            # -------------------------
-            link = None
-            link_tag = c.find("a", class_="boton")
-            if link_tag and link_tag.get("href"):
-                href = link_tag["href"]
-                if href.startswith("Info.aspx"):
-                    link = f"https://stratfordpadelclub.matchpoint.com.es/ActBooking/{href}"
-                elif href.startswith("/"):
-                    link = f"https://stratfordpadelclub.matchpoint.com.es{href}"
-                elif href.startswith("http"):
-                    link = href
-
+            # Extract sign-up link
+            link = self.extract_link(container)
             if not link:
                 continue
 
-            # -------------------------
-            # Add session
-            # -------------------------
-            sessions.append(
-                {
-                    "title": title,
-                    "date": date_str,
-                    "day_name": day_name,
-                    "time": f"{start_time}-{end_time}",
-                    "instructor": instructor,
-                    "vacancies": vacancies,
-                    "court": court,
-                    "levels": levels,
-                    "link": link,
-                }
-            )
+            info["sign_up_link"] = link
+            sessions.append(info)
 
         return sessions
 
-    # -------------------------
-    # Main entry
-    # -------------------------
-    def search(self) -> List[Dict]:
-        print("🚀 Starting activity search")
+    def extract_session_info(self, container) -> Optional[Dict]:
+        try:
+            dt_span = container.find("span", id=lambda x: x and "LabelHorarioValor" in x)
+            status_span = container.find("span", id=lambda x: x and "LabelEstadoActividadValor" in x)
+            court_span = container.find("span", id=lambda x: x and "LabelLugarValor" in x)
+            instructor_span = container.find("span", id=lambda x: x and "LabelMonitorValor" in x)
 
-        results = []
-        dates = self.get_dates()
-        print(f"Checking {len(dates)} days")
+            dt_text = dt_span.get_text(strip=True)
+            dt_match = re.search(r"(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2}-\d{2}:\d{2})", dt_text)
+            if not dt_match:
+                return None
 
-        for d in dates:
-            html = self.fetch_day(d)
+            status = status_span.get_text(strip=True)
+            vacancies = int(re.search(r"(\d+)", status).group(1)) if "vacancies available" in status else None
+
+            return {
+                "type": container.find("span", class_="textoTituloPubli2").get_text(strip=True),
+                "date": dt_match.group(1),
+                "time": dt_match.group(2),
+                "status": status,
+                "court": court_span.get_text(strip=True) if court_span else "",
+                "instructor": instructor_span.get_text(strip=True) if instructor_span else "",
+                "vacancies": vacancies,
+            }
+        except Exception:
+            return None
+
+    def extract_link(self, container) -> Optional[str]:
+        try:
+            link_tag = container.find("a", class_="boton", string="Sign up")
+            if link_tag:
+                href = link_tag.get("href")
+                if href.startswith("Info.aspx"):
+                    return f"https://stratfordpadelclub.matchpoint.com.es/ActBooking/{href}"
+            return None
+        except Exception:
+            return None
+
+    def add_day_of_week(self, sessions: List[Dict]) -> List[Dict]:
+        for s in sessions:
+            try:
+                s["day_of_week"] = datetime.strptime(s["date"], "%d/%m/%Y").strftime("%A")
+            except Exception:
+                s["day_of_week"] = "Unknown"
+        return sessions
+
+    def filter_sessions_by_time(self, sessions: List[Dict]) -> List[Dict]:
+        time_filters = self.config.get("time_filters", {})
+        filtered = []
+        for s in sessions:
+            day = s["day_of_week"]
+            start_hour = int(s["time"].split("-")[0].split(":")[0])
+            if day in ["Saturday", "Sunday"]:
+                cfg = time_filters.get("weekends", {})
+            else:
+                cfg = time_filters.get("weekdays", {}).get(day.lower(), {})
+            if cfg.get("enabled", True) and cfg.get("start_hour", 0) <= start_hour <= cfg.get("end_hour", 23):
+                filtered.append(s)
+        return filtered
+
+    def sort_sessions_by_date(self, sessions: List[Dict]) -> List[Dict]:
+        return sorted(sessions, key=lambda x: datetime.strptime(x["date"], "%d/%m/%Y"))
+
+    def print_sessions(self, sessions: List[Dict]):
+        print("=" * 50)
+        print(f"Searching activities: {', '.join(self.activity_names)}")
+        print(f"Generated on: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+        print(f"Total sessions: {len(sessions)}")
+        print("=" * 50)
+        for s in sessions:
+            print(f"{s['type']} - {s['date']} ({s['day_of_week']}) {s['time']} - {s['instructor']}")
+            print(f"Vacancies: {s['vacancies']} | Sign-up: {s['sign_up_link']}")
+            print("-" * 50)
+
+    def search_for_sessions(self):
+        dates = self.get_date_range()
+        all_sessions = []
+
+        for date in dates:
+            html = self.fetch_booking_page(date)
             if not html:
                 continue
-
             day_sessions = self.parse_activity_sessions(html)
-            print(f"→ {len(day_sessions)} valid sessions found")
+            all_sessions.extend(day_sessions)
+            time.sleep(0.5)
 
-            results.extend(day_sessions)
+        all_sessions = self.add_day_of_week(all_sessions)
+        available = [s for s in all_sessions if "Complete" not in s["status"]]
+        filtered = self.filter_sessions_by_time(available)
+        filtered_sorted = self.sort_sessions_by_date(filtered)
 
-        print(f"✅ Total activities collected: {len(results)}")
-        print(results)
-        return results
+        self.print_sessions(filtered_sorted)
 
 
 def main():
-    """Main function to run the scraper"""
-    print("Starting Stratford Padel Club Activity Finder...")
+    app = typer.Typer()
 
-    try:
+    @app.callback(invoke_without_command=True)
+    def cli(
+        activity_names: str = typer.Option(None, help="Comma-separated activity names"),
+        days: int = typer.Option(None, help="Days to search"),
+        weekdays: str = typer.Option(None, help="Weekday time filter JSON"),
+        weekends: str = typer.Option(None, help="Weekend time filter JSON"),
+        verbose: bool = typer.Option(False, help="Verbose logging"),
+    ):
         scraper = StratfordPadelActivityScraper()
-    except Exception as e:
-        print(f"Error initializing scraper: {e}")
-        return
+        if activity_names:
+            scraper.activity_names = [name.strip() for name in activity_names.split(",")]
+        if days:
+            scraper.days_to_search = days
+        if weekdays:
+            scraper.config["time_filters"]["weekdays"] = json.loads(weekdays)
+        if weekends:
+            scraper.config["time_filters"]["weekends"] = json.loads(weekends)
+        if verbose:
+            scraper.config["debug_settings"]["verbose_logging"] = True
 
-    try:
-        # Search for activity sessions based on config
-        scraper.search()
-    except KeyboardInterrupt:
-        print("\nSearch interrupted by user.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        import traceback
+        scraper.search_for_sessions()
 
-        traceback.print_exc()
+    app()
 
 
 if __name__ == "__main__":

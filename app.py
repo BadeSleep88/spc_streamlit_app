@@ -146,7 +146,6 @@ with tab_activities:
         enabled = st.checkbox(label, True, key=f"a_{label}")
         if not enabled:
             return {"enabled": False}
-
         start, end = st.slider(
             f"{label} time",
             8,
@@ -154,13 +153,9 @@ with tab_activities:
             (default_start, default_end),
             key=f"s_{label}",
         )
+        return {"enabled": True, "start_hour": start, "end_hour": end}
 
-        return {
-            "enabled": True,
-            "start_hour": start,
-            "end_hour": end,
-        }
-
+    # Time filters dictionary
     time_filters = {
         "monday": activity_day("Monday", 8, 22),
         "tuesday": activity_day("Tuesday", 8, 22),
@@ -179,9 +174,8 @@ with tab_activities:
         scraper = StratfordPadelActivityScraper()
         scraper.config["days_ahead"] = days_ahead
         scraper.config["time_filters"] = time_filters
-        scraper.config["keywords"] = keywords
-        print(scraper.config)
-        return scraper.search()
+        scraper.config["activity_search"] = {"activity_name": list(keywords)}
+        return scraper.search_for_sessions()  # Updated method that returns filtered + sorted sessions
 
     # -------------------------
     # Run search
@@ -196,12 +190,13 @@ with tab_activities:
                     time_filters,
                     tuple(selected_activities),  # cache-safe
                 )
-                print(activities)
+
             if not activities:
                 st.info("No activities found for the selected filters.")
             else:
                 st.success(f"Found {len(activities)} activities")
 
+                # Display in markdown cards like games tab
                 for a in activities:
                     st.markdown(
                         f"""
@@ -212,14 +207,13 @@ with tab_activities:
                             border-radius:12px;
                             margin-bottom:10px;
                         ">
-                            <b>{a['title']}</b><br>
-                            📅 {a['date']} ({a['day_name']})<br>
+                            <b>{a['type']}</b><br>
+                            📅 {a['date']} ({a['day_of_week']})<br>
                             ⏰ {a['time']}<br>
                             {"👤 <b>Instructor:</b> " + a["instructor"] + "<br>" if a.get("instructor") else ""}
                             {"🎟️ <b>Vacancies:</b> " + str(a["vacancies"]) + "<br>" if a.get("vacancies") is not None else ""}
-                            {"🎯 <b>Level:</b> " + a["levels"] + "<br>" if a.get("levels") else ""}
                             {"📍 <b>Court:</b> " + a["court"] + "<br>" if a.get("court") else ""}
-                            <a href="{a['link']}"
+                            <a href="{a['sign_up_link']}"
                             target="_blank"
                             style="color:#4FC3F7;font-weight:bold">
                             🔗 Open booking
