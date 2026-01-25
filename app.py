@@ -54,7 +54,7 @@ tab_games, tab_activities = st.tabs(["🎾 Find Games", "🏃 Find Activities"])
 # 🎾 FIND GAMES TAB
 # =====================================================
 with tab_games:
-    st.subheader("Search Padel Matches")
+    st.subheader("Find Matches")
 
     # Level inputs
     col1, col2 = st.columns(2)
@@ -121,7 +121,7 @@ with tab_games:
 # 🏃 FIND ACTIVITIES TAB
 # =====================================================
 with tab_activities:
-    st.subheader("Find Activities at Stratford Padel Club")
+    st.subheader("Find Activities")
 
     days_ahead = st.slider("Days ahead", 1, 42, 7, key="a_days_ahead")
 
