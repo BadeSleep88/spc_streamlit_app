@@ -524,6 +524,7 @@ def main():
     import typer
 
     app = typer.Typer(help="Stratford Padel Club Match Finder")
+    print("CALLBACKCLI")
 
     @app.callback()
     def cli(
