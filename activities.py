@@ -207,6 +207,9 @@ class StratfordPadelActivityScraper:
 
         self.print_sessions(filtered_sorted)
 
+        # Add this line to make it Streamlit-friendly
+        return filtered_sorted
+
 
 def main():
     app = typer.Typer()
