@@ -173,12 +173,12 @@ with tab_activities:
     # Cached search runner
     # -------------------------
     @st.cache_data(ttl=3600, show_spinner=False)
-    def run_activity_search(days_ahead, weekdays, weekends, keywords):
+    def run_activity_search(days_ahead, weekdays, weekends, selected_activities):
         scraper = StratfordPadelActivityScraper()
         scraper.config["activity_search"]["days_to_search"] = days_ahead
         scraper.config["time_filters"]["weekdays"] = weekdays
         scraper.config["time_filters"]["weekends"] = weekends
-        scraper.config["activity_search"]["activity_name"] = {"activity_name": list(keywords)}
+        scraper.config["activity_search"]["activity_name"] = list(selected_activities)
         print(scraper.config)
         return scraper.search_for_sessions()  # Updated method that returns filtered + sorted sessions
 
