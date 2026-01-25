@@ -72,10 +72,7 @@ class StratfordPadelActivityScraper:
             print(f"❌ Failed to fetch {date}: {e}")
             return None
 
-    # -------------------------
-    # Parse
-    # -------------------------
-    def parse_sessions(self, html: str = None) -> List[Dict]:
+    def parse_sessions(self, html: str) -> List[Dict]:
         soup = BeautifulSoup(html, "html.parser")
         sessions = []
 
@@ -83,17 +80,23 @@ class StratfordPadelActivityScraper:
         print(f"Found {len(containers)} containers")
 
         for c in containers:
+            # -------------------------
+            # Title
+            # -------------------------
             title_span = c.find("span", class_="textoTituloPubli2")
             if not title_span:
                 continue
 
             title = title_span.get_text(strip=True)
 
-            # Keyword filtering (early)
-            if self.config["keywords"]:
+            # Exact keyword filtering (case-sensitive)
+            if self.config.get("keywords"):
                 if not any(k in title for k in self.config["keywords"]):
                     continue
 
+            # -------------------------
+            # Date & time
+            # -------------------------
             datetime_span = c.find("span", id=lambda x: x and "LabelHorarioValor" in x)
             if not datetime_span:
                 continue
@@ -105,21 +108,56 @@ class StratfordPadelActivityScraper:
             if not m:
                 continue
 
-            date_str = m.group(1)
-            start_time = m.group(2)
-
+            date_str, start_time, end_time = m.groups()
             date_obj = datetime.strptime(date_str, "%d/%m/%Y")
             day_name = date_obj.strftime("%A")
 
+            # -------------------------
             # Time filter
+            # -------------------------
             cfg = self.config["time_filters"].get(day_name.lower())
             hour = int(start_time.split(":")[0])
+
             if not cfg or not cfg["enabled"]:
                 continue
             if not (cfg["start_hour"] <= hour <= cfg["end_hour"]):
                 continue
 
-            # Find signup link
+            # -------------------------
+            # Instructor
+            # -------------------------
+            instructor = "N/A"
+            instructor_span = c.find("span", id=lambda x: x and "LabelProfesor" in x)
+            if instructor_span:
+                instructor = instructor_span.get_text(strip=True)
+
+            # -------------------------
+            # Vacancies
+            # -------------------------
+            vacancies = "N/A"
+            vacancies_span = c.find("span", id=lambda x: x and "LabelPlazasDisponibles" in x)
+            if vacancies_span:
+                vacancies = vacancies_span.get_text(strip=True)
+
+            # -------------------------
+            # Court / location
+            # -------------------------
+            court = None
+            court_span = c.find("span", id=lambda x: x and "LabelUbicacion" in x)
+            if court_span:
+                court = court_span.get_text(strip=True)
+
+            # -------------------------
+            # Levels (NEW)
+            # -------------------------
+            levels = None
+            levels_span = c.find("span", id=lambda x: x and "LabelNiveles" in x)
+            if levels_span:
+                levels = levels_span.get_text(strip=True)
+
+            # -------------------------
+            # Signup link
+            # -------------------------
             link = None
             link_tag = c.find("a", class_="boton")
             if link_tag and link_tag.get("href"):
@@ -134,12 +172,19 @@ class StratfordPadelActivityScraper:
             if not link:
                 continue
 
+            # -------------------------
+            # Final session
+            # -------------------------
             sessions.append(
                 {
                     "title": title,
                     "date": date_str,
                     "day_name": day_name,
-                    "time": f"{m.group(2)}-{m.group(3)}",
+                    "time": f"{start_time}-{end_time}",
+                    "instructor": instructor,
+                    "vacancies": vacancies,
+                    "court": court,
+                    "levels": levels,
                     "link": link,
                 }
             )

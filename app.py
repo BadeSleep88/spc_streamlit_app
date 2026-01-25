@@ -215,8 +215,10 @@ with tab_activities:
                             <b>{a['title']}</b><br>
                             📅 {a['date']} ({a['day_name']})<br>
                             ⏰ {a['time']}<br>
-                            👤 <b>Instructor:</b> {a.get('instructor', 'N/A')}<br>
-                            🎟️ <b>Vacancies:</b> {a.get('vacancies', 'N/A')}<br>
+                            {"👤 <b>Instructor:</b> " + a["instructor"] + "<br>" if a.get("instructor") else ""}
+                            {"🎟️ <b>Vacancies:</b> " + str(a["vacancies"]) + "<br>" if a.get("vacancies") is not None else ""}
+                            {"🎯 <b>Level:</b> " + a["levels"] + "<br>" if a.get("levels") else ""}
+                            {"📍 <b>Court:</b> " + a["court"] + "<br>" if a.get("court") else ""}
                             <a href="{a['link']}"
                             target="_blank"
                             style="color:#4FC3F7;font-weight:bold">
