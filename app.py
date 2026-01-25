@@ -54,12 +54,13 @@ st.divider()
 # --------------------
 # Time filters
 # --------------------
+# --------------------
+# Time filters
+# --------------------
 st.subheader("⏰ Time filters")
 
-st.markdown("### Weekdays")
 
-
-def weekday_block(label, default_start, default_end):
+def day_block(label, default_start, default_end):
     enabled = st.checkbox(label, value=True)
     if not enabled:
         return {"enabled": False}
@@ -78,26 +79,21 @@ def weekday_block(label, default_start, default_end):
     }
 
 
+# Weekdays
 weekday_cfg = {
-    "monday": weekday_block("Monday", 19, 23),
-    "tuesday": weekday_block("Tuesday", 18, 23),
-    "wednesday": weekday_block("Wednesday", 19, 23),
-    "thursday": weekday_block("Thursday", 19, 23),
-    "friday": weekday_block("Friday", 18, 23),
+    "monday": day_block("Monday", 19, 23),
+    "tuesday": day_block("Tuesday", 18, 23),
+    "wednesday": day_block("Wednesday", 19, 23),
+    "thursday": day_block("Thursday", 19, 23),
+    "friday": day_block("Friday", 18, 23),
 }
 
-st.markdown("### Weekend (always enabled)")
-
-weekend_start, weekend_end = st.slider(
-    "Weekend time window",
-    min_value=0,
-    max_value=23,
-    value=(9, 22),
-)
+# Weekends now separate days
+st.markdown("### Weekends")
 
 weekend_cfg = {
-    "start_hour": weekend_start,
-    "end_hour": weekend_end,
+    "saturday": day_block("Saturday", 9, 22),
+    "sunday": day_block("Sunday", 9, 22),
 }
 
 st.divider()
