@@ -114,17 +114,19 @@ with tab_games:
             for m in matches:
                 st.markdown(
                     f"""
-                    <div class="full-width-card">
-                        <b>📅 {m['date']} ({m['day_of_week']})</b><br>
-                        {line("⏰", "Start Time", m.get("time"))}
-                        {line("👤", "Level Range", m.get("level_range"))}
+                <div class="full-width-card">
+                <b>📅 {m['date']} ({m['day_of_week']})</b><br>
+                {line("⏰", "Start Time", m.get("time"))}
+                {line("👤", "Level Range", m.get("level_range"))}
 
-                        <a href="{m['link'].replace('Match.aspx','Share.aspx')}" 
-                           style="color:#1E90FF" target="_blank">🔗 Open booking</a>
-                    </div>
-                    """,
+                <a href="{m['link'].replace('Match.aspx','Share.aspx')}"
+                style="color:#1E90FF"
+                target="_blank">🔗 Open booking</a>
+                </div>
+                """,
                     unsafe_allow_html=True,
                 )
+
 
 # =====================================================
 # 🏃 FIND ACTIVITIES TAB
