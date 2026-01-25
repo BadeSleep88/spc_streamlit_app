@@ -84,16 +84,16 @@ def display_matches_grid(matches):
                     f"""
                     <div style="
                         padding: 10px; 
-                        border: 1px solid #ddd; 
                         border-radius: 10px; 
-                        background-color: #f9f9f9;
+                        background-color: #013A63;  /* French Navy Blue */
+                        color: white;               /* White text */
                         margin-bottom: 10px;
                     ">
                         <p style='margin:2px'><strong>{match['date']} ({match['day_of_week']})</strong></p>
                         <p style='margin:2px'>Time: {match['time']}</p>
                         <p style='margin:2px'>Level: {match['level_range']}</p>
                         <p style='margin:2px'>Type: {match['type']}</p>
-                        {"<p style='margin:2px'><a href=\"" + match['link'] + "\" target='_blank'>🔗 Match Link</a></p>" if match.get("link") else ""}
+                        {"<p style='margin:2px'><a href=\"" + match['link'] + "\" target='_blank' style='color:#1E90FF; text-decoration: underline;'>🔗 Match Link</a></p>" if match.get("link") else ""}
                     </div>
                     """,
                     unsafe_allow_html=True,
