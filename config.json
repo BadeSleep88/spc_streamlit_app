@@ -2,20 +2,15 @@
   "activity_search": {
     "activity_name": [
       "Train and Play Green",
-      "Train and Play Blue",
       "Train and Play Orange",
-      "Train and Play Yellow",
       "Padel Academy Green",
       "Padel Academy Orange",
-      "Padel Academy Blue",
-      "Padel Academy Yellow",
-      "Ball machine training",
-      "Private Class",
       "PadelConnect Intermediates",
       "PadelConnect Beginners",
       "PadelConnect Improvers",
-      "PadelConnect Advanced",
-      "Matchplay with coach"
+      "Matchplay with coach",
+      "Ball machine training",
+      "Private Class"
     ],
     "days_to_search": 42
   },
