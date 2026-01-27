@@ -232,11 +232,11 @@ with tab_activities:
                     )
 
 # =====================================================
-# 🏃 CALENDER SYNC TAB
+# 🏃 CALENDAR SYNC TAB
 # =====================================================
 with tab_calendar:
     st.subheader("📅 Sync Upcoming Matches & Activities")
-    st.caption("Add SPC events directly to your calendar (Apple / Google / Outlook)")
+    st.caption("Import SPC events into Apple / Google / Outlook Calendar")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -244,80 +244,120 @@ with tab_calendar:
     with col2:
         password = st.text_input("Password", type="password")
 
+    # -------------------------------
+    # Helpers
+    # -------------------------------
     def generate_uid(item):
         raw = f"{item.match_id}|{item.date}|{item.time_start}"
         return hashlib.sha1(raw.encode()).hexdigest()
 
-    def build_ics(item: UpcomingItem):
+    def build_vevent(item: UpcomingItem):
         start = datetime.strptime(f"{item.date} {item.time_start}", "%d/%m/%Y %H:%M")
         end = datetime.strptime(f"{item.date} {item.time_end}", "%d/%m/%Y %H:%M")
 
         uid = generate_uid(item)
 
-        return f"""BEGIN:VCALENDAR
-                    VERSION:2.0
-                    PRODID:-//SPC Finder//EN
-                    BEGIN:VEVENT
-                    UID:{uid}
-                    DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}
-                    DTSTART:{start.strftime('%Y%m%dT%H%M%S')}
-                    DTEND:{end.strftime('%Y%m%dT%H%M%S')}
-                    SUMMARY:🎾 Padel – {item.court}
-                    DESCRIPTION:{item.description}\\n{item.url}
-                    URL:{item.url}
-                    BEGIN:VALARM
-                    TRIGGER:-PT5H
-                    ACTION:DISPLAY
-                    DESCRIPTION:Padel in 5 hours
-                    END:VALARM
-                    BEGIN:VALARM
-                    TRIGGER:-PT30M
-                    ACTION:DISPLAY
-                    DESCRIPTION:Padel in 30 minutes
-                    END:VALARM
-                    END:VEVENT
-                    END:VCALENDAR
-                """
+        return f"""BEGIN:VEVENT
+UID:{uid}
+DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}
+DTSTART:{start.strftime('%Y%m%dT%H%M%S')}
+DTEND:{end.strftime('%Y%m%dT%H%M%S')}
+SUMMARY:🎾 Padel – {item.court}
+DESCRIPTION:{item.description}\\n{item.url}
+URL:{item.url}
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Padel in 30 minutes
+END:VALARM
+END:VEVENT
+"""
 
-    if st.button("📡 Fetch upcoming items", type="primary"):
+    def build_calendar(events: list[str]):
+        body = "\n".join(events)
+        return f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//SPC Finder//EN
+CALSCALE:GREGORIAN
+{body}
+END:VCALENDAR
+"""
+
+    # -------------------------------
+    # Fetch button
+    # -------------------------------
+    fetch_clicked = st.button("📡 Fetch upcoming items", type="primary")
+
+    if fetch_clicked:
         if not email or not password:
             st.warning("Please enter email and password")
-            st.stop()
+        else:
+            with st.spinner("Logging in and fetching events..."):
+                client = StratfordPadelMatchFetcher(
+                    username=email,
+                    password=password,
+                    verbose=False,
+                )
 
-        with st.spinner("Logging in and fetching events..."):
-            client = StratfordPadelMatchFetcher(
-                username=email,
-                password=password,
-                verbose=False,
+                authenticated = client.is_authenticated
+                items = client.get_upcoming_items() if authenticated else []
+
+            # spinner ALWAYS ends before we reach here ✅
+
+            if not authenticated:
+                st.error("❌ Login failed. Please check credentials.")
+            elif not items:
+                st.info("No upcoming items found.")
+            else:
+                st.session_state["calendar_items"] = items
+                st.session_state["calendar_selection"] = {generate_uid(i): True for i in items}
+
+    # -------------------------------
+    # Render items + selection
+    # -------------------------------
+    items = st.session_state.get("calendar_items", [])
+
+    if items:
+        st.success(f"Found {len(items)} upcoming events")
+
+        st.markdown("### Select events to add")
+        for item in items:
+            uid = generate_uid(item)
+
+            st.session_state["calendar_selection"][uid] = st.checkbox(
+                f"🎾 {item.court} · {item.date} · {item.time_start}–{item.time_end}",
+                value=st.session_state["calendar_selection"].get(uid, True),
+                key=f"chk_{uid}",
             )
 
-            if not client.is_authenticated:
-                st.error("❌ Login failed. Please check credentials.")
-                st.stop()
+        # -------------------------------
+        # Add to calendar (single button)
+        # -------------------------------
+        st.divider()
+        right = st.columns([3, 1])[1]
 
-            items = client.get_upcoming_items()
+        with right:
+            if st.button("➕ Add selected to calendar", type="primary"):
+                selected_events = []
 
-        if not items:
-            st.info("No upcoming items found.")
-        else:
-            st.success(f"Found {len(items)} upcoming events")
+                for item in items:
+                    uid = generate_uid(item)
+                    if st.session_state["calendar_selection"].get(uid):
+                        selected_events.append(build_vevent(item))
 
-            for item in items:
-                ics = build_ics(item)
-                filename = f"spc_{generate_uid(item)}.ics"
+                if not selected_events:
+                    st.warning("No events selected.")
+                else:
+                    calendar_ics = build_calendar(selected_events)
 
-                st.markdown(
-                    f"""
-                    <div class="full-width-card">
-                    <b>🎾 {item.court}</b><br>
-                    📅 {item.date}<br>
-                    ⏰ {item.time_start} – {item.time_end}<br><br>
-                    <a href="data:text/calendar;charset=utf-8,{quote(ics)}"
-                       download="{filename}"
-                       style="color:#4FC3F7;font-weight:bold">
-                       ➕ Add to calendar
-                    </a>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    st.download_button(
+                        label="📥 Download calendar file",
+                        data=calendar_ics,
+                        file_name="spc_matches.ics",
+                        mime="text/calendar",
+                    )
+
+                    st.info(
+                        "On iOS/macOS this opens Calendar directly. "
+                        "On Google Calendar, upload the file once to import."
+                    )
