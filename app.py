@@ -358,6 +358,5 @@ END:VCALENDAR
                     )
 
                     st.info(
-                        "On iOS/macOS this opens Calendar directly. "
-                        "On Google Calendar, upload the file once to import."
+                        "On iOS this opens Calendar directly. " "On Android, open the file once to import."
                     )
