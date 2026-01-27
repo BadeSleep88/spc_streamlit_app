@@ -85,7 +85,7 @@ class StratfordPadelActivityScraper:
             link = self.extract_link(c)
 
             if info and link:
-                info["sign_up_link"] = link
+                info["sign_up_link"] = link.replace("Info.aspx", "Share.aspx")
                 sessions.append(info)
                 self._log(f"Found session: {info['type']} on {info['date']} at {info['time']}")
 

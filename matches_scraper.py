@@ -141,7 +141,7 @@ class StratfordPadelMatchScraper:
                     "level_max": level_parts[1],
                     "level_range": f"{level_parts[0]} - {level_parts[1]}",
                     "type": "Mixed Padel Match",
-                    "link": link,
+                    "link": link.replace("Match.aspx", "Share.aspx"),
                 }
             )
 
