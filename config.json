@@ -1,0 +1,35 @@
+{
+  "activity_search": {
+    "activity_name": [
+        "Train and Play Green",
+        "Train and Play Blue",
+        "Train and Play Orange",
+        "Train and Play Yellow",
+        "Padel Academy Green",
+        "Padel Academy Orange",
+        "Padel Academy Blue",
+        "Padel Academy Yellow",
+        "Ball machine training",
+        "Private Class",
+        "PadelConnect Intermediates",
+        "PadelConnect Beginners",
+        "PadelConnect Improvers",
+        "PadelConnect Advanced",
+        "Matchplay with coach"
+        ],
+    "days_to_search": 42
+  },
+  "time_filters": {
+    "weekdays": {
+      "monday": { "enabled": true, "start_hour": 8, "end_hour": 23 },
+      "tuesday": { "enabled": true, "start_hour": 8, "end_hour": 23 },
+      "wednesday": { "enabled": true, "start_hour": 8, "end_hour": 23 },
+      "thursday": { "enabled": true, "start_hour": 8, "end_hour": 23 },
+      "friday": { "enabled": true, "start_hour": 8, "end_hour": 23 }
+    },
+    "weekends": {
+      "saturday": { "enabled": true, "start_hour": 8, "end_hour": 23 },
+      "sunday": { "enabled": true, "start_hour": 8, "end_hour": 23 }
+    }
+  }
+}

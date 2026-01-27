@@ -1,6 +1,8 @@
+import json
 import re
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
@@ -8,7 +10,7 @@ from bs4 import BeautifulSoup
 
 
 class StratfordPadelActivityScraper:
-    def __init__(self):
+    def __init__(self, config_path: str = "config.json"):
         self.base_url = "https://stratfordpadelclub.matchpoint.com.es/ActBooking/Agenda.aspx"
         self.headers = {
             "User-Agent": (
@@ -17,29 +19,17 @@ class StratfordPadelActivityScraper:
                 "Chrome/91.0.4472.124 Safari/537.36"
             )
         }
-        self.config = self.default_config()
+        self.config = self.load_config(config_path)
 
     @staticmethod
-    def default_config() -> Dict:
-        return {
-            "activity_search": {
-                "activity_name": ["Train and Play Orange", "Private Class"],
-                "days_to_search": 10,
-            },
-            "time_filters": {
-                "weekdays": {
-                    "monday": {"enabled": True, "start_hour": 18, "end_hour": 23},
-                    "tuesday": {"enabled": True, "start_hour": 18, "end_hour": 23},
-                    "wednesday": {"enabled": True, "start_hour": 18, "end_hour": 23},
-                    "thursday": {"enabled": True, "start_hour": 11, "end_hour": 23},
-                    "friday": {"enabled": True, "start_hour": 18, "end_hour": 23},
-                },
-                "weekends": {
-                    "saturday": {"enabled": True, "start_hour": 8, "end_hour": 22},
-                    "sunday": {"enabled": True, "start_hour": 8, "end_hour": 22},
-                },
-            },
-        }
+    def load_config(path: str = "config.json") -> Dict:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            raise RuntimeError(f"Config file not found: {path}")
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Invalid JSON in config file: {e}")
 
     # -----------------------
     # Core scraping
