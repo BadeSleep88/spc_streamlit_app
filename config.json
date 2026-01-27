@@ -1,23 +1,37 @@
 {
   "activity_search": {
     "activity_name": [
-        "Train and Play Green",
-        "Train and Play Blue",
-        "Train and Play Orange",
-        "Train and Play Yellow",
-        "Padel Academy Green",
-        "Padel Academy Orange",
-        "Padel Academy Blue",
-        "Padel Academy Yellow",
-        "Ball machine training",
-        "Private Class",
-        "PadelConnect Intermediates",
-        "PadelConnect Beginners",
-        "PadelConnect Improvers",
-        "PadelConnect Advanced",
-        "Matchplay with coach"
-        ],
+      "Train and Play Green",
+      "Train and Play Blue",
+      "Train and Play Orange",
+      "Train and Play Yellow",
+      "Padel Academy Green",
+      "Padel Academy Orange",
+      "Padel Academy Blue",
+      "Padel Academy Yellow",
+      "Ball machine training",
+      "Private Class",
+      "PadelConnect Intermediates",
+      "PadelConnect Beginners",
+      "PadelConnect Improvers",
+      "PadelConnect Advanced",
+      "Matchplay with coach"
+    ],
     "days_to_search": 42
+  },
+  "match_search": {
+    "search_settings": {
+      "level_range": { "min": 3.0, "max": 3.5 },
+      "weeks_to_search": 5
+    },
+    "url_parameters": {
+      "sexo": "todos",
+      "amigos": "false",
+      "jugado": "false",
+      "idDeporte": "undefined",
+      "nivel": "false",
+      "idcentro": "undefined"
+    }
   },
   "time_filters": {
     "weekdays": {
@@ -31,5 +45,9 @@
       "saturday": { "enabled": true, "start_hour": 8, "end_hour": 23 },
       "sunday": { "enabled": true, "start_hour": 8, "end_hour": 23 }
     }
+  },
+  "debug_settings": {
+    "verbose_logging": true,
+    "save_raw_html": false
   }
 }

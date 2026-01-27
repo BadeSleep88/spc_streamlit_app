@@ -2,7 +2,6 @@ import json
 import re
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
@@ -10,7 +9,7 @@ from bs4 import BeautifulSoup
 
 
 class StratfordPadelActivityScraper:
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self, config_path: str = "config.json", verbose: bool = True):
         self.base_url = "https://stratfordpadelclub.matchpoint.com.es/ActBooking/Agenda.aspx"
         self.headers = {
             "User-Agent": (
@@ -19,8 +18,22 @@ class StratfordPadelActivityScraper:
                 "Chrome/91.0.4472.124 Safari/537.36"
             )
         }
+        self.verbose = verbose
         self.config = self.load_config(config_path)
+        self._log(
+            f"Scraper initialized. Searching for activities: {self.config['activity_search']['activity_name']}"
+        )
 
+    # =========================
+    # Logging
+    # =========================
+    def _log(self, message: str) -> None:
+        if self.verbose:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+
+    # =========================
+    # Config
+    # =========================
     @staticmethod
     def load_config(path: str = "config.json") -> Dict:
         try:
@@ -31,19 +44,18 @@ class StratfordPadelActivityScraper:
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Invalid JSON in config file: {e}")
 
-    # -----------------------
+    # =========================
     # Core scraping
-    # -----------------------
-
+    # =========================
     def get_date_range(self) -> List[str]:
         today = datetime.now()
-        return [
-            (today + timedelta(days=i)).strftime("%d-%m-%Y")
-            for i in range(self.config["activity_search"]["days_to_search"])
-        ]
+        days = self.config["activity_search"]["days_to_search"]
+        self._log(f"Generating date range for next {days} days")
+        return [(today + timedelta(days=i)).strftime("%d-%m-%Y") for i in range(days)]
 
     def fetch_booking_page(self, date: str) -> Optional[str]:
         try:
+            self._log(f"Fetching booking page for {date}")
             r = requests.get(
                 self.base_url,
                 params={"d": date},
@@ -52,7 +64,8 @@ class StratfordPadelActivityScraper:
             )
             r.raise_for_status()
             return r.text
-        except requests.RequestException:
+        except requests.RequestException as e:
+            self._log(f"Error fetching {date}: {e}")
             return None
 
     def parse_activity_sessions(self, html: str) -> List[Dict]:
@@ -74,6 +87,7 @@ class StratfordPadelActivityScraper:
             if info and link:
                 info["sign_up_link"] = link
                 sessions.append(info)
+                self._log(f"Found session: {info['type']} on {info['date']} at {info['time']}")
 
         return sessions
 
@@ -102,24 +116,21 @@ class StratfordPadelActivityScraper:
                 "status": status,
                 "vacancies": vacancies,
             }
-        except Exception:
+        except Exception as e:
+            self._log(f"Failed to extract session info: {e}")
             return None
 
     def extract_link(self, container) -> Optional[str]:
         link = container.find("a", class_="boton", string="Sign up")
-        if not link:
-            return None
-
-        href = link.get("href")
-        if href and href.startswith("Info.aspx"):
-            return f"https://stratfordpadelclub.matchpoint.com.es/ActBooking/{href}"
-
+        if link:
+            href = link.get("href")
+            if href and href.startswith("Info.aspx"):
+                return f"https://stratfordpadelclub.matchpoint.com.es/ActBooking/{href}"
         return None
 
-    # -----------------------
+    # =========================
     # Filtering & sorting
-    # -----------------------
-
+    # =========================
     def filter_sessions(self, sessions: List[Dict]) -> List[Dict]:
         filtered = []
         for s in sessions:
@@ -137,6 +148,7 @@ class StratfordPadelActivityScraper:
 
             if cfg.get("enabled") and cfg["start_hour"] <= start_hour <= cfg["end_hour"]:
                 filtered.append(s)
+                self._log(f"Session {s['type']} on {s['date']} at {s['time']} passed time filter")
 
         return sorted(filtered, key=lambda x: datetime.strptime(x["date"], "%d/%m/%Y"))
 
@@ -146,15 +158,17 @@ class StratfordPadelActivityScraper:
         for date in self.get_date_range():
             html = self.fetch_booking_page(date)
             if html:
-                all_sessions.extend(self.parse_activity_sessions(html))
+                day_sessions = self.parse_activity_sessions(html)
+                all_sessions.extend(day_sessions)
+                self._log(f"Total sessions found so far: {len(all_sessions)}")
             time.sleep(0.2)
 
+        self._log(f"Finished fetching sessions. Filtering now...")
         return self.filter_sessions(all_sessions)
 
-    # -----------------------
+    # =========================
     # Telegram helpers
-    # -----------------------
-
+    # =========================
     @staticmethod
     def format_sessions_for_telegram(sessions: List[Dict]) -> str:
         if not sessions:
@@ -183,9 +197,8 @@ class StratfordPadelActivityScraper:
 
     @staticmethod
     def send_to_telegram(message: str, bot_token: str, chat_id: str):
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         requests.post(
-            url,
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
             json={
                 "chat_id": chat_id,
                 "text": message,
@@ -197,12 +210,11 @@ class StratfordPadelActivityScraper:
 
 
 def main():
-    scraper = StratfordPadelActivityScraper()
-    sessions = scraper.search_for_sessions()
-
-    message = scraper.format_sessions_for_telegram(sessions)
-
     import os
+
+    scraper = StratfordPadelActivityScraper(verbose=True)
+    sessions = scraper.search_for_sessions()
+    message = scraper.format_sessions_for_telegram(sessions)
 
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
