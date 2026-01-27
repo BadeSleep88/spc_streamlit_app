@@ -236,11 +236,11 @@ with tab_activities:
 # =====================================================
 with tab_calendar:
     st.subheader("📅 Sync Upcoming Matches & Activities")
-    st.caption("Import SPC events into Apple / Google / Outlook Calendar")
+    st.caption("Import SPC events into your Calendar")
 
     col1, col2 = st.columns(2)
     with col1:
-        email = st.text_input("MatchPoint Email")
+        email = st.text_input("Email")
     with col2:
         password = st.text_input("Password", type="password")
 
