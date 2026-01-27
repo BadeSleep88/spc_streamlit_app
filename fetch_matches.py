@@ -35,6 +35,7 @@ class StratfordPadelMatchFetcher:
         self.username = username
         self.password = password
         self.verbose = verbose
+        self._is_authenticated: bool = False
 
         self._log("🔐 Initialising MatchPoint client")
 
@@ -50,7 +51,8 @@ class StratfordPadelMatchFetcher:
         )
 
         self._login()
-        self._log("✅ Session ready")
+        if self.is_authenticated:
+            self._log("✅ Session ready")
 
     # =========================
     # Logging
@@ -63,41 +65,63 @@ class StratfordPadelMatchFetcher:
     # Authentication
     # =========================
     def _login(self) -> None:
-        self._log("➡️ Loading login page")
-        login_page = self.session.get(LOGIN_URL)
-        login_page.raise_for_status()
-        soup = BeautifulSoup(login_page.text, "html.parser")
+        try:
+            self._log("➡️ Loading login page")
+            login_page = self.session.get(LOGIN_URL)
+            login_page.raise_for_status()
 
-        def val(name: str) -> str:
-            el = soup.find("input", {"name": name})
-            return el.get("value", "") if el else ""
+            soup = BeautifulSoup(login_page.text, "html.parser")
 
-        payload = {
-            "__VIEWSTATE": val("__VIEWSTATE"),
-            "__EVENTVALIDATION": val("__EVENTVALIDATION"),
-            "__VIEWSTATEGENERATOR": val("__VIEWSTATEGENERATOR"),
-            "ctl00$ContentPlaceHolderContenido$Login1$UserName": self.username,
-            "ctl00$ContentPlaceHolderContenido$Login1$Password": self.password,
-            "ctl00$ContentPlaceHolderContenido$Login1$LoginButton": "Sign in",
-        }
+            def val(name: str) -> str:
+                el = soup.find("input", {"name": name})
+                return el.get("value", "") if el else ""
 
-        self._log("➡️ Submitting login form")
-        resp = self.session.post(
-            f"{LOGIN_URL}?return_url=%7e%2fIntranet%2fSchedule.aspx",
-            data=payload,
-            allow_redirects=True,
-        )
-        resp.raise_for_status()
+            payload = {
+                "__VIEWSTATE": val("__VIEWSTATE"),
+                "__EVENTVALIDATION": val("__EVENTVALIDATION"),
+                "__VIEWSTATEGENERATOR": val("__VIEWSTATEGENERATOR"),
+                "ctl00$ContentPlaceHolderContenido$Login1$UserName": self.username,
+                "ctl00$ContentPlaceHolderContenido$Login1$Password": self.password,
+                "ctl00$ContentPlaceHolderContenido$Login1$LoginButton": "Sign in",
+            }
 
-        if "Schedule.aspx" not in resp.url:
-            raise RuntimeError("Login failed")
+            self._log("➡️ Submitting login form")
+            self.session.post(
+                f"{LOGIN_URL}?return_url=%7e%2fIntranet%2fSchedule.aspx",
+                data=payload,
+                allow_redirects=True,
+            )
 
-        self._log("✅ Logged in successfully")
+            check = self.session.get(SCHEDULE_URL)
+            check.raise_for_status()
+            check_soup = BeautifulSoup(check.text, "html.parser")
+
+            self._is_authenticated = not bool(
+                check_soup.find(
+                    "input",
+                    {"name": "ctl00$ContentPlaceHolderContenido$Login1$UserName"},
+                )
+            )
+
+            self._log("✅ Login successful" if self._is_authenticated else "❌ Login failed")
+
+        except Exception as e:
+            self._is_authenticated = False
+            self._log(f"❌ Login error: {e}")
 
     # =========================
     # Public API
     # =========================
+
+    @property
+    def is_authenticated(self) -> bool:
+        return self._is_authenticated
+
     def get_upcoming_items(self) -> List[UpcomingItem]:
+
+        if not self.is_authenticated:
+            return []
+
         self._log("📡 Fetching upcoming items")
 
         activities = self._fetch_next_activities()
@@ -267,9 +291,9 @@ class StratfordPadelMatchFetcher:
 # =========================
 def main() -> None:
     client = StratfordPadelMatchFetcher(
-        username="test",
-        password="test",
-        verbose=True,  # 🔊 toggle logs here
+        username="",
+        password="",
+        verbose=True,
     )
 
     upcoming = client.get_upcoming_items()

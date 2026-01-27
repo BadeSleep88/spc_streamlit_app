@@ -1,6 +1,11 @@
+import hashlib
+from datetime import datetime, timedelta
+from urllib.parse import quote
+
 import streamlit as st
 
 from activities_scraper import StratfordPadelActivityScraper
+from fetch_matches import StratfordPadelMatchFetcher, UpcomingItem
 from matches_scraper import StratfordPadelMatchScraper
 
 # --------------------
@@ -55,7 +60,8 @@ st.divider()
 # --------------------
 # Tabs
 # --------------------
-tab_games, tab_activities = st.tabs(["🎾 Find Games", "🏃 Find Activities"])
+tab_games, tab_activities, tab_calendar = st.tabs(["🎾 Find Games", "🏃 Find Activities", "📅 Calendar Sync"])
+
 
 # =====================================================
 # 🎾 FIND GAMES TAB
@@ -224,3 +230,94 @@ with tab_activities:
                         """,
                         unsafe_allow_html=True,
                     )
+
+# =====================================================
+# 🏃 CALENDER SYNC TAB
+# =====================================================
+with tab_calendar:
+    st.subheader("📅 Sync Upcoming Matches & Activities")
+    st.caption("Add SPC events directly to your calendar (Apple / Google / Outlook)")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        email = st.text_input("MatchPoint Email")
+    with col2:
+        password = st.text_input("Password", type="password")
+
+    def generate_uid(item):
+        raw = f"{item.match_id}|{item.date}|{item.time_start}"
+        return hashlib.sha1(raw.encode()).hexdigest()
+
+    def build_ics(item: UpcomingItem):
+        start = datetime.strptime(f"{item.date} {item.time_start}", "%d/%m/%Y %H:%M")
+        end = datetime.strptime(f"{item.date} {item.time_end}", "%d/%m/%Y %H:%M")
+
+        uid = generate_uid(item)
+
+        return f"""BEGIN:VCALENDAR
+                    VERSION:2.0
+                    PRODID:-//SPC Finder//EN
+                    BEGIN:VEVENT
+                    UID:{uid}
+                    DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}
+                    DTSTART:{start.strftime('%Y%m%dT%H%M%S')}
+                    DTEND:{end.strftime('%Y%m%dT%H%M%S')}
+                    SUMMARY:🎾 Padel – {item.court}
+                    DESCRIPTION:{item.description}\\n{item.url}
+                    URL:{item.url}
+                    BEGIN:VALARM
+                    TRIGGER:-PT5H
+                    ACTION:DISPLAY
+                    DESCRIPTION:Padel in 5 hours
+                    END:VALARM
+                    BEGIN:VALARM
+                    TRIGGER:-PT30M
+                    ACTION:DISPLAY
+                    DESCRIPTION:Padel in 30 minutes
+                    END:VALARM
+                    END:VEVENT
+                    END:VCALENDAR
+                """
+
+    if st.button("📡 Fetch upcoming items", type="primary"):
+        if not email or not password:
+            st.warning("Please enter email and password")
+            st.stop()
+
+        with st.spinner("Logging in and fetching events..."):
+            client = StratfordPadelMatchFetcher(
+                username=email,
+                password=password,
+                verbose=False,
+            )
+
+            if not client.is_authenticated:
+                st.error("❌ Login failed. Please check credentials.")
+                st.stop()
+
+            items = client.get_upcoming_items()
+
+        if not items:
+            st.info("No upcoming items found.")
+        else:
+            st.success(f"Found {len(items)} upcoming events")
+
+            for item in items:
+                ics = build_ics(item)
+                filename = f"spc_{generate_uid(item)}.ics"
+
+                st.markdown(
+                    f"""
+                    <div class="full-width-card">
+                    <b>🎾 {item.court}</b><br>
+                    📅 {item.date}<br>
+                    ⏰ {item.time_start} – {item.time_end}<br><br>
+                    <a href="data:text/calendar;charset=utf-8,{quote(ics)}"
+                       download="{filename}"
+                       style="color:#4FC3F7;font-weight:bold">
+                       ➕ Add to calendar
+                    </a>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
