@@ -23,23 +23,15 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Make tabs bigger */
+    /* Tabs scrollable horizontally on small screens */
+    div[data-baseweb="tab-list"] {
+        overflow-x: auto;
+        display: flex;
+    }
     div[data-baseweb="tab-list"] button {
-        font-size: 18px;
-        padding: 12px 24px;
-    }
-    /* Make cards full width */
-    .full-width-card {
-        width: 100%;
-        margin-bottom: 12px;
-        padding: 12px;
-        border-radius: 12px;
-        background: #013A63;
-        color: white;
-    }
-    /* Add spacing between controls */
-    .control-spacing {
-        margin-bottom: 12px;
+        flex-shrink: 0;  /* prevent buttons from shrinking */
+        font-size: 16px;
+        padding: 8px 16px;
     }
     </style>
     """,
