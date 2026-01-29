@@ -222,7 +222,6 @@ def main():
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
     if bot_token and chat_id:
-        print(bot_token, chat_id)
         scraper.send_to_telegram(message, bot_token, chat_id)
     else:
         print(message)
