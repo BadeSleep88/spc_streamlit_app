@@ -197,7 +197,7 @@ class StratfordPadelActivityScraper:
 
     @staticmethod
     def send_to_telegram(message: str, bot_token: str, chat_id: str):
-        requests.post(
+        resp = requests.post(
             f"https://api.telegram.org/bot{bot_token}/sendMessage",
             json={
                 "chat_id": chat_id,
@@ -207,6 +207,8 @@ class StratfordPadelActivityScraper:
             },
             timeout=10,
         )
+
+        print("Telegram response:", resp.status_code, resp.text)
 
 
 def main():
@@ -220,6 +222,7 @@ def main():
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
     if bot_token and chat_id:
+        print(bot_token, chat_id)
         scraper.send_to_telegram(message, bot_token, chat_id)
     else:
         print(message)
