@@ -87,9 +87,9 @@ with tab_games:
     @st.cache_data(ttl=3600, show_spinner=False)
     def run_match_search(level_min, level_max, weeks, weekdays, weekends):
         scraper = StratfordPadelMatchScraper()
-        scraper.config["search_settings"]["level_range"]["min"] = level_min
-        scraper.config["search_settings"]["level_range"]["max"] = level_max
-        scraper.config["search_settings"]["weeks_to_search"] = weeks
+        scraper.config["match_search"]["search_settings"]["level_range"]["min"] = level_min
+        scraper.config["match_search"]["search_settings"]["level_range"]["max"] = level_max
+        scraper.config["match_search"]["search_settings"]["weeks_to_search"] = weeks
         scraper.config["time_filters"]["weekdays"] = weekdays
         scraper.config["time_filters"]["weekends"] = weekends
 
