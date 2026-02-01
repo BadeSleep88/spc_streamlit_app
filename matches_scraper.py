@@ -174,24 +174,48 @@ class StratfordPadelMatchScraper:
     # =========================
     # Adding dates
     # =========================
-    def add_date_info(self, matches: List[Dict]) -> List[Dict]:
-        current = datetime.now()
+    def add_date_info(
+        self,
+        matches: List[Dict],
+        start_date_str: str,
+    ) -> List[Dict]:
+        """
+        Adds correct calendar dates to matches.
+        Handles date ranges that span into the next month.
+        """
+        start_date = datetime.strptime(start_date_str, "%d/%m/%Y")
+        start_day = start_date.day
 
         for m in matches:
-            day_name = m["day_name"]
-            day_number = int(m["day_number"])
-            target_weekday = self.get_weekday_number(day_name)
-            days_to_add = (target_weekday - current.weekday()) % 7
+            day = int(m["day_number"])
 
-            match_date = current + timedelta(days=days_to_add)
-            while match_date.day != day_number:
-                match_date += timedelta(days=7)
+            # Base date: first day of queried month
+            base_date = start_date.replace(day=1)
 
-            m["date"] = match_date.strftime("%d/%m/%Y")
-            m["day_of_week"] = match_date.strftime("%A")
-            m["datetime_obj"] = match_date
+            # If day resets, move to next month
+            if day < start_day:
+                year = base_date.year + (base_date.month == 12)
+                month = 1 if base_date.month == 12 else base_date.month + 1
+                base_date = base_date.replace(year=year, month=month)
 
-        self._log(f"Added date info to {len(matches)} matches")
+            match_date = base_date.replace(day=day)
+
+            # Optional validation
+            expected_weekday = self.get_weekday_number(m["day_name"])
+            if match_date.weekday() != expected_weekday:
+                self._log(
+                    f"⚠️ Weekday mismatch: {m['day_name']} "
+                    f"but {match_date.strftime('%A')} for {match_date:%d/%m/%Y}"
+                )
+
+            m.update(
+                {
+                    "date": match_date.strftime("%d/%m/%Y"),
+                    "day_of_week": match_date.strftime("%A"),
+                    "datetime_obj": match_date,
+                }
+            )
+
         return matches
 
     @staticmethod
@@ -216,17 +240,20 @@ class StratfordPadelMatchScraper:
     # =========================
     def search_matches(self) -> List[Dict]:
         self._log("Starting full match search...")
-        all_matches = []
+        all_matches: List[Dict] = []
 
         for start, end in self.get_week_ranges():
             html = self.fetch_matches_page(start, end)
-            if html:
-                day_matches = self.parse_matches(html)
-                all_matches.extend(day_matches)
+            if not html:
+                continue
 
-        filtered = self.filter_matches_by_time(all_matches)
-        filtered = self.add_date_info(filtered)
-        sorted_matches = self.sort_matches_by_date(filtered)
+            matches = self.parse_matches(html)
+            matches = self.filter_matches_by_time(matches)
+            matches = self.add_date_info(matches, start)
+
+            all_matches.extend(matches)
+
+        sorted_matches = self.sort_matches_by_date(all_matches)
         self._log(f"Search complete: {len(sorted_matches)} matches found")
         return sorted_matches
 
