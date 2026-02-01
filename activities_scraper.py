@@ -106,7 +106,7 @@ class StratfordPadelActivityScraper:
                 share_url = link.replace("Info.aspx", "Share.aspx")
 
                 # 👇 Only fetch levels for specific activities
-                if any(x in info["type"].lower() for x in ["train and play", "matchplay"]):
+                if any(x in info["type"].lower() for x in ["train and play", "matchplay", "academy"]):
                     levels = self.fetch_activity_levels(info_url)
                     info["levels"] = levels
                 else:
