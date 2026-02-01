@@ -53,6 +53,23 @@ class StratfordPadelActivityScraper:
         self._log(f"Generating date range for next {days} days")
         return [(today + timedelta(days=i)).strftime("%d-%m-%Y") for i in range(days)]
 
+    def fetch_activity_levels(self, info_url: str) -> Optional[str]:
+        try:
+            self._log(f"Fetching activity details: {info_url}")
+            r = requests.get(info_url, headers=self.headers, timeout=10)
+            r.raise_for_status()
+
+            soup = BeautifulSoup(r.text, "html.parser")
+
+            levels_span = soup.find("span", id=lambda x: x and "LabelNiveles" in x)
+            if levels_span:
+                return levels_span.get_text(strip=True)
+
+            return None
+        except Exception as e:
+            self._log(f"Failed to fetch levels from {info_url}: {e}")
+            return None
+
     def fetch_booking_page(self, date: str) -> Optional[str]:
         try:
             self._log(f"Fetching booking page for {date}")
@@ -85,9 +102,23 @@ class StratfordPadelActivityScraper:
             link = self.extract_link(c)
 
             if info and link:
-                info["sign_up_link"] = link.replace("Info.aspx", "Share.aspx")
+                info_url = link  # Info.aspx
+                share_url = link.replace("Info.aspx", "Share.aspx")
+
+                # 👇 Only fetch levels for specific activities
+                if any(x in info["type"].lower() for x in ["train and play", "matchplay"]):
+                    levels = self.fetch_activity_levels(info_url)
+                    info["levels"] = levels
+                else:
+                    info["levels"] = None
+
+                info["sign_up_link"] = share_url
                 sessions.append(info)
-                self._log(f"Found session: {info['type']} on {info['date']} at {info['time']}")
+
+                self._log(
+                    f"Found session: {info['type']} on {info['date']} at {info['time']} "
+                    f"(levels={info['levels']})"
+                )
 
         return sessions
 
@@ -181,9 +212,12 @@ class StratfordPadelActivityScraper:
         ]
 
         for s in sessions:
+            name = s["type"]
+            if s.get("levels"):
+                name = f"{name} ({s['levels']})"
             lines.extend(
                 [
-                    f"*{s['type']}*",
+                    f"*{name}*",
                     f"📅 {s['date']} ({s['day_of_week']})",
                     f"⏰ {s['time']}",
                     f"👤 {s['instructor']}",

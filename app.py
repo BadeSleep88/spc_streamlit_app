@@ -205,7 +205,7 @@ with tab_activities:
                     st.markdown(
                         f"""
                         <div class="full-width-card">
-                        <b>{a['type']}</b><br>
+                        <b>{a['type']}{f" (Level {a['levels']})" if a.get("levels") else ""}</b><br>
                         📅 {a['date']} ({a['day_of_week']})<br>
 
                         {line("⏰", "Time", a.get("time"))}
