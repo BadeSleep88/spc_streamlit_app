@@ -1,0 +1,16 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Once per day at 09:00 UTC
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit app
+        run: |
+          curl -fsSL --max-time 30 -A "keepalive-bot" \
+          https://spcappapp-mdxchduptfdihwozgbp796.streamlit.app/ || true
