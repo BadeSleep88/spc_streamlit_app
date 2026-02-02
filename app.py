@@ -96,11 +96,15 @@ with tab_games:
         all_matches = []
         for start, end in scraper.get_week_ranges():
             html = scraper.fetch_matches_page(start, end)
-            if html:
-                all_matches.extend(scraper.parse_matches(html))
+            if not html:
+                continue
 
-        filtered = scraper.filter_matches_by_time(all_matches)
-        return scraper.add_date_info(filtered)
+            matches = scraper.parse_matches(html)
+            matches = scraper.filter_matches_by_time(matches)
+            matches = scraper.add_date_info(matches, start)
+
+            all_matches.extend(matches)
+        return scraper.sort_matches_by_date(all_matches)
 
     if st.button("Search Matches", type="primary", key="search_games"):
         with st.spinner("Searching matches..."):
