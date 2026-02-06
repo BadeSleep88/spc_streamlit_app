@@ -1,3 +1,4 @@
+import argparse
 import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -19,8 +20,8 @@ class StratfordPadelMatchScraper:
         self.config = self.load_config(config_path)
         self._log(
             f"Scraper initialized. Searching for matches with level range "
-            f"{self.config["match_search"]["search_settings"]["level_range"]} over "
-            f"{self.config["match_search"]["search_settings"]["level_range"]} weeks."
+            f"{self.config['match_search']['search_settings']['level_range']} over "
+            f"{self.config['match_search']['search_settings']['weeks_to_search']} weeks."
         )
 
     # =========================
@@ -42,6 +43,54 @@ class StratfordPadelMatchScraper:
             raise RuntimeError(f"Config file not found: {path}")
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Invalid JSON in config file: {e}")
+
+    # =========================
+    # Telegram
+    # =========================
+    @staticmethod
+    def send_to_telegram(message: str, bot_token: str, chat_id: str):
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        try:
+            response = requests.post(
+                url,
+                json={
+                    "chat_id": chat_id,
+                    "text": message,
+                    "parse_mode": "Markdown",
+                    "disable_web_page_preview": True,
+                },
+                timeout=10,
+            )
+            if response.status_code != 200:
+                print("⚠️ Failed to send message to Telegram: " + response.text)
+        except requests.RequestException as e:
+            print(f"⚠️ Failed to send message to Telegram: {e}")
+
+    @staticmethod
+    def format_matches_for_telegram(matches: List[Dict]) -> str:
+        """Format a list of matches as a Telegram-friendly Markdown message"""
+        if not matches:
+            return "❌ No matches found."
+
+        lines = [
+            f"🎾 *Stratford Padel – Available Matches ({len(matches)})*",
+            f"_Updated: {datetime.now().strftime('%d/%m %H:%M')}_",
+            "",
+        ]
+
+        for m in matches:
+            lines.extend(
+                [
+                    f"*{m['type']}*",
+                    f"📅 {m['date']} ({m['day_of_week']})",
+                    f"⏰ {m['time']}",
+                    f"🎯 Level: {m['level_range']}",
+                    f"🔗 [Join]({m['link']})",
+                    "",
+                ]
+            )
+
+        return "\n".join(lines)
 
     # =========================
     # Date handling
@@ -160,9 +209,9 @@ class StratfordPadelMatchScraper:
             hour = int(m["time"].split(":")[0])
 
             cfg = None
-            if day_name in time_filters["weekdays"]:
+            if day_name in time_filters.get("weekdays", {}):
                 cfg = time_filters["weekdays"][day_name]
-            elif day_name in time_filters["weekends"]:
+            elif day_name in time_filters.get("weekends", {}):
                 cfg = time_filters["weekends"][day_name]
 
             if cfg and cfg["enabled"] and cfg["start_hour"] <= hour <= cfg["end_hour"]:
@@ -187,6 +236,26 @@ class StratfordPadelMatchScraper:
         start_day = start_date.day
 
         for m in matches:
+            day = int(m["day_number"])
+
+            # Base date: first day of queried month
+            base_date = start_date.replace(day=1)
+
+            # If day resets, move to next month
+            if day < start_day:
+                year = base_date.year + (base_date.month == 12)
+                month = 1 if base_date.month == 12 else base_date.month + 1
+                base_date = base_date.replace(year=year, month=month)
+
+            match_date = base_date.replace(day=day)
+
+            # Optional validationf
+            expected_weekday = self.get_weekday_number(m["day_name"])
+            if match_date.weekday() != expected_weekday:
+                self._log(
+                    f"⚠️ Weekday mismatch: {m['day_name']} "
+                    f"but {match_date.strftime('%A')} for {match_date:%d/%m/%Y}"
+                )
             day = int(m["day_number"])
 
             # Base date: first day of queried month
@@ -259,11 +328,29 @@ class StratfordPadelMatchScraper:
 
 
 def main():
-    import json
     import os
 
+    parser = argparse.ArgumentParser(description="Scrape Stratford Padel matches.")
+    parser.add_argument(
+        "--send-to-telegram",
+        action="store_true",
+        help="If set, send Telegram message.",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="config.json",
+        help="Path to config file.",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging.",
+    )
+    args = parser.parse_args()
+
     # Initialize scraper
-    scraper = StratfordPadelMatchScraper()
+    scraper = StratfordPadelMatchScraper(config_path=args.config, verbose=args.verbose)
 
     # Run search
     matches = scraper.search_matches()
@@ -283,6 +370,19 @@ def main():
             f"🔗 Link: {m['link']}\n"
             "-----------------------"
         )
+
+    if args.send_to_telegram:
+        # Get Telegram token and chat id (from config or arg)
+        telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+        if not telegram_bot_token or not telegram_chat_id:
+            print("❌ Telegram bot token and chat id must be provided (via args or config).")
+            return
+
+        message = scraper.format_matches_for_telegram(matches)
+        StratfordPadelMatchScraper.send_to_telegram(message, telegram_bot_token, telegram_chat_id)
+        print(f"✅ Sent Telegram message: {message}")
 
 
 if __name__ == "__main__":
