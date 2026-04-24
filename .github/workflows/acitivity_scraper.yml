@@ -2,7 +2,7 @@ name: Activity Scraper
 
 on:
   schedule:
-    - cron: '0 7,10,13,15,17,19,21,23 * * *'
+    - cron: '0 6,9,13,17,19,21,23 * * *'
   workflow_dispatch:
 
 jobs:
