@@ -89,7 +89,10 @@ class StratfordPadelActivityScraper:
         soup = BeautifulSoup(html, "html.parser")
         sessions = []
 
-        for c in soup.find_all("div", class_="contenedor2Columnas2"):
+        containers = soup.find_all("div", class_="contenedor2Columnas2")
+        self._log(f"Found {len(containers)} activity containers in HTML")
+
+        for c in containers:
             title = c.find("span", class_="textoTituloPubli2")
             if not title:
                 continue
@@ -124,26 +127,53 @@ class StratfordPadelActivityScraper:
 
     def extract_session_info(self, container) -> Optional[Dict]:
         try:
-            dt_span = container.find("span", id=lambda x: x and "LabelHorarioValor" in x)
+            title_span = container.find("span", class_="textoTituloPubli2")
+            date_span = container.find("span", id=lambda x: x and "LabelHorarioValor" in x)
+            time_span = container.find("span", id=lambda x: x and "LabelHoraValor" in x)
             status_span = container.find("span", id=lambda x: x and "LabelEstadoActividadValor" in x)
             instructor_span = container.find("span", id=lambda x: x and "LabelMonitorValor" in x)
+            place_span = container.find("span", id=lambda x: x and "LabelLugarValor" in x)
 
-            match = re.search(
-                r"(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2}-\d{2}:\d{2})",
-                dt_span.get_text(strip=True),
-            )
-            if not match:
+            if not title_span or not date_span:
                 return None
 
-            status = status_span.get_text(strip=True)
-            vacancies = int(re.search(r"(\d+)", status).group(1)) if "vacancies available" in status else None
+            date_text = date_span.get_text(strip=True)
+            time_text = time_span.get_text(strip=True) if time_span else ""
+
+            # New layout: date in LabelHorarioValor, time in LabelHoraValor
+            date_match = re.search(r"\d{2}/\d{2}/\d{4}", date_text)
+            time_match = re.search(
+                r"\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}",
+                time_text or date_text,
+            )
+
+            if date_match and time_match:
+                date_str = date_match.group(0)
+                time_str = re.sub(r"\s+", "", time_match.group(0))
+            else:
+                # Legacy layout: "26/05/2026 9:00-10:00" in one span
+                combined = re.search(
+                    r"(\d{2}/\d{2}/\d{4})\s+(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})",
+                    f"{date_text} {time_text}",
+                )
+                if not combined:
+                    return None
+                date_str = combined.group(1)
+                time_str = re.sub(r"\s+", "", combined.group(2))
+
+            status = status_span.get_text(strip=True) if status_span else ""
+            vacancies = None
+            if "vacancies available" in status.lower():
+                vac_match = re.search(r"(\d+)", status)
+                vacancies = int(vac_match.group(1)) if vac_match else None
 
             return {
-                "type": container.find("span", class_="textoTituloPubli2").get_text(strip=True),
-                "date": match.group(1),
-                "time": match.group(2),
-                "day_of_week": datetime.strptime(match.group(1), "%d/%m/%Y").strftime("%A"),
+                "type": title_span.get_text(strip=True),
+                "date": date_str,
+                "time": time_str,
+                "day_of_week": datetime.strptime(date_str, "%d/%m/%Y").strftime("%A"),
                 "instructor": instructor_span.get_text(strip=True) if instructor_span else "",
+                "place": place_span.get_text(strip=True) if place_span else "",
                 "status": status,
                 "vacancies": vacancies,
             }
@@ -152,21 +182,99 @@ class StratfordPadelActivityScraper:
             return None
 
     def extract_link(self, container) -> Optional[str]:
-        link = container.find("a", class_="boton", string="Sign up")
-        if link:
+        for link in container.find_all("a", class_="boton"):
+            if "sign up" not in link.get_text(strip=True).lower():
+                continue
             href = link.get("href")
-            if href and href.startswith("Info.aspx"):
+            if not href:
+                continue
+            if href.startswith("http"):
+                return href
+            if href.startswith("/"):
+                return f"https://stratfordpadelclub.matchpoint.com.es{href}"
+            if href.startswith("Info.aspx"):
                 return f"https://stratfordpadelclub.matchpoint.com.es/ActBooking/{href}"
         return None
 
     # =========================
     # Filtering & sorting
     # =========================
+    def _parse_session_level_lower_bound(self, levels: Optional[str]) -> Optional[float]:
+        """Return the lower numeric bound parsed from the `levels` text."""
+        if not levels:
+            return None
+
+        # Examples we try to handle:
+        # - "3,5"
+        # - "Nivel 3.5"
+        # - "3,0 - 3,5"
+        numbers = re.findall(r"(\d+(?:[.,]\d+)?)", levels)
+        if not numbers:
+            return None
+
+        values: List[float] = []
+        for n in numbers:
+            try:
+                values.append(float(n.replace(",", ".")))
+            except ValueError:
+                continue
+
+        return min(values) if values else None
+
     def filter_sessions(self, sessions: List[Dict]) -> List[Dict]:
         filtered = []
+        level_range = self.config.get("match_search", {}).get("search_settings", {}).get("level_range", {})
+        min_level = None if level_range.get("min") is None else float(level_range["min"])
+        max_level = None if level_range.get("max") is None else float(level_range["max"])
+
+        activity_cfg = self.config.get("activity_search", {})
+        private_allowed = activity_cfg.get("private_class_instructors")
+        excluded_coaches = {
+            c.strip().lower()
+            for c in activity_cfg.get("exclude_coach", [])
+            if isinstance(c, str) and c.strip()
+        }
+
         for s in sessions:
             if "Complete" in s["status"]:
                 continue
+
+            instructor = (s.get("instructor") or "").strip()
+            if excluded_coaches and instructor.lower() in excluded_coaches:
+                self._log(
+                    f"Session {s['type']} on {s['date']} at {s['time']} filtered: "
+                    f"Coach '{instructor}' is in exclude_coach"
+                )
+                continue
+
+            if private_allowed is not None and "Private Class" in s["type"]:
+                if not any(
+                    p.strip().lower() in instructor.lower()
+                    for p in private_allowed
+                    if isinstance(p, str) and p.strip()
+                ):
+                    self._log(
+                        f"Session {s['type']} on {s['date']} at {s['time']} filtered: "
+                        f"Private Class instructor '{instructor}' not in private_class_instructors"
+                    )
+                    continue
+
+            # Filter by configured min/max only when a numeric level exists.
+            # If a session has no level (or it's unparseable), we keep it.
+            level_lower_bound = self._parse_session_level_lower_bound(s.get("levels"))
+            if level_lower_bound is not None:
+                if min_level is not None and level_lower_bound < min_level:
+                    self._log(
+                        f"Session {s['type']} on {s['date']} at {s['time']} filtered by level "
+                        f"(level={level_lower_bound} < min={min_level})"
+                    )
+                    continue
+                if max_level is not None and level_lower_bound > max_level:
+                    self._log(
+                        f"Session {s['type']} on {s['date']} at {s['time']} filtered by level "
+                        f"(level={level_lower_bound} > max={max_level})"
+                    )
+                    continue
 
             start_hour = int(s["time"].split(":")[0])
             day = s["day_of_week"].lower()
