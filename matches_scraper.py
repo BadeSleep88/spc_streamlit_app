@@ -1,10 +1,31 @@
-import argparse
 import json
+import argparse
+import re
+import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+
+def _configure_stdout_encoding() -> None:
+    """Avoid UnicodeEncodeError on Windows consoles and when redirecting output."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass
+
+
+_configure_stdout_encoding()
+
+
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class StratfordPadelMatchScraper:
@@ -131,6 +152,8 @@ class StratfordPadelMatchScraper:
             )
 
             self._log(f"Fetching matches page for {start_date} to {end_date} with params {params}")
+            print(self.base_url)
+            print(params)
             response = requests.get(self.base_url, params=params, headers=self.headers, timeout=10)
             response.raise_for_status()
             return response.text
@@ -141,12 +164,64 @@ class StratfordPadelMatchScraper:
     # =========================
     # Parsing matches
     # =========================
+    @staticmethod
+    def _extract_match_link(container) -> str:
+        """Extract match URL from container onclick or legacy enter link."""
+        onclick = container.get("onclick", "")
+        if onclick:
+            match = re.search(
+                r"window\.location(?:\.href)?\s*=\s*['\"]([^'\"]+)['\"]",
+                onclick,
+            )
+            if match:
+                path = match.group(1)
+                if path.startswith("/"):
+                    return f"https://stratfordpadelclub.matchpoint.com.es{path}"
+                if path.startswith("http"):
+                    return path
+                return f"https://stratfordpadelclub.matchpoint.com.es/Matches/{path}"
+
+        enter_link = container.find("a", class_="boton")
+        if enter_link:
+            href = enter_link.get("href", "")
+            if href.startswith("Match.aspx"):
+                return f"https://stratfordpadelclub.matchpoint.com.es/Matches/{href}"
+            if href.startswith("/Matches/"):
+                return f"https://stratfordpadelclub.matchpoint.com.es{href}"
+        return ""
+
+    @staticmethod
+    def _parse_calendar(container) -> tuple:
+        """Parse month/day/year from divCalendar; returns (day_number, day_name, date_str)."""
+        cal = container.find("div", class_="divCalendar")
+        if not cal:
+            return None, None, None
+
+        spans = [s.get_text(strip=True) for s in cal.find_all("span") if s.get_text(strip=True)]
+        if len(spans) < 3:
+            return None, None, None
+
+        month_str, day_str, year_str = spans[0], spans[1], spans[2]
+        try:
+            match_date = datetime.strptime(f"{day_str} {month_str} {year_str}", "%d %b %Y")
+            return (
+                str(match_date.day),
+                match_date.strftime("%A"),
+                match_date.strftime("%d/%m/%Y"),
+            )
+        except ValueError:
+            return day_str, None, None
+
     def parse_matches(self, html_content: str) -> List[Dict]:
         """Extract match info from HTML"""
         soup = BeautifulSoup(html_content, "html.parser")
         matches = []
 
-        containers = soup.find_all("div", class_="contenedorContenidoPartidas")
+        containers = soup.find_all(
+            "div",
+            class_=lambda c: c
+            and ("contenedorContenidoPartidas3" in c or "contenedorContenidoPartidas" in c),
+        )
         self._log(f"Found {len(containers)} match containers in HTML")
 
         for c in containers:
@@ -154,9 +229,17 @@ class StratfordPadelMatchScraper:
             day_number_span = c.find("span", id=lambda x: x and "LabelFechaInicio" in x)
             time_span = c.find("span", id=lambda x: x and "LabelHoraInicio" in x)
             level_span = c.find("span", id=lambda x: x and "LabelNivelValor" in x)
-            enter_link = c.find("a", class_="boton")
+            sex_span = c.find("span", id=lambda x: x and "LabelSexoValor" in x)
+            sport_span = c.find("span", id=lambda x: x and "LabelDeporte" in x)
 
-            if not all([day_span, day_number_span, time_span, level_span]):
+            cal_day, cal_weekday, cal_date = self._parse_calendar(c)
+
+            if not time_span or not level_span:
+                continue
+
+            day_name = day_span.get_text(strip=True) if day_span else cal_weekday
+            day_number = day_number_span.get_text(strip=True) if day_number_span else cal_day
+            if not day_number:
                 continue
 
             level_parts = level_span.get_text(strip=True).split(" - ")
@@ -175,24 +258,34 @@ class StratfordPadelMatchScraper:
             if not (min_level < cfg_max and max_level > cfg_min):
                 continue
 
-            link = ""
-            if enter_link:
-                link = enter_link.get("href", "")
-                if link.startswith("Match.aspx"):
-                    link = f"https://stratfordpadelclub.matchpoint.com.es/Matches/{link}"
+            link = self._extract_match_link(c).replace("Match.aspx", "Share.aspx")
 
-            matches.append(
-                {
-                    "day_name": day_span.get_text(strip=True),
-                    "day_number": day_number_span.get_text(strip=True),
-                    "time": time_span.get_text(strip=True),
-                    "level_min": level_parts[0],
-                    "level_max": level_parts[1],
-                    "level_range": f"{level_parts[0]} - {level_parts[1]}",
-                    "type": "Mixed Padel Match",
-                    "link": link.replace("Match.aspx", "Share.aspx"),
-                }
-            )
+            sex = sex_span.get_text(strip=True).lstrip("- ").strip() if sex_span else "Mixed"
+            sport = sport_span.get_text(strip=True) if sport_span else "Padel"
+            match_type = f"{sex} {sport} Match"
+
+            match_data = {
+                "day_name": day_name or "",
+                "day_number": day_number,
+                "time": time_span.get_text(strip=True),
+                "level_min": level_parts[0],
+                "level_max": level_parts[1],
+                "level_range": f"{level_parts[0]} - {level_parts[1]}",
+                "type": match_type,
+                "link": link,
+            }
+            if cal_date:
+                match_data["date"] = cal_date
+                if day_name:
+                    match_data["day_of_week"] = day_name
+                elif cal_weekday:
+                    match_data["day_of_week"] = cal_weekday
+                try:
+                    match_data["datetime_obj"] = datetime.strptime(cal_date, "%d/%m/%Y")
+                except ValueError:
+                    pass
+
+            matches.append(match_data)
 
         self._log(f"Parsed {len(matches)} matches after filtering by level")
         return matches
@@ -236,6 +329,11 @@ class StratfordPadelMatchScraper:
         start_day = start_date.day
 
         for m in matches:
+            if m.get("date") and m.get("datetime_obj"):
+                if not m.get("day_of_week"):
+                    m["day_of_week"] = m["datetime_obj"].strftime("%A")
+                continue
+
             day = int(m["day_number"])
 
             # Base date: first day of queried month
@@ -249,33 +347,13 @@ class StratfordPadelMatchScraper:
 
             match_date = base_date.replace(day=day)
 
-            # Optional validationf
-            expected_weekday = self.get_weekday_number(m["day_name"])
-            if match_date.weekday() != expected_weekday:
-                self._log(
-                    f"⚠️ Weekday mismatch: {m['day_name']} "
-                    f"but {match_date.strftime('%A')} for {match_date:%d/%m/%Y}"
-                )
-            day = int(m["day_number"])
-
-            # Base date: first day of queried month
-            base_date = start_date.replace(day=1)
-
-            # If day resets, move to next month
-            if day < start_day:
-                year = base_date.year + (base_date.month == 12)
-                month = 1 if base_date.month == 12 else base_date.month + 1
-                base_date = base_date.replace(year=year, month=month)
-
-            match_date = base_date.replace(day=day)
-
-            # Optional validation
-            expected_weekday = self.get_weekday_number(m["day_name"])
-            if match_date.weekday() != expected_weekday:
-                self._log(
-                    f"⚠️ Weekday mismatch: {m['day_name']} "
-                    f"but {match_date.strftime('%A')} for {match_date:%d/%m/%Y}"
-                )
+            if m.get("day_name"):
+                expected_weekday = self.get_weekday_number(m["day_name"])
+                if match_date.weekday() != expected_weekday:
+                    self._log(
+                        f"⚠️ Weekday mismatch: {m['day_name']} "
+                        f"but {match_date.strftime('%A')} for {match_date:%d/%m/%Y}"
+                    )
 
             m.update(
                 {
@@ -329,6 +407,8 @@ class StratfordPadelMatchScraper:
 
 def main():
     import os
+
+    _configure_stdout_encoding()
 
     parser = argparse.ArgumentParser(description="Scrape Stratford Padel matches.")
     parser.add_argument(
