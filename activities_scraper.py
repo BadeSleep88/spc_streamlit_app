@@ -89,7 +89,9 @@ class StratfordPadelActivityScraper:
         soup = BeautifulSoup(html, "html.parser")
         sessions = []
 
-        containers = soup.find_all("div", class_="contenedor2Columnas2")
+        containers = soup.find_all("div", class_="contenedorResultadosBusqueda")
+        if not containers:
+            containers = soup.find_all("div", class_="contenedor2Columnas2")
         self._log(f"Found {len(containers)} activity containers in HTML")
 
         for c in containers:
@@ -182,18 +184,26 @@ class StratfordPadelActivityScraper:
             return None
 
     def extract_link(self, container) -> Optional[str]:
+        signup = None
         for link in container.find_all("a", class_="boton"):
-            if "sign up" not in link.get_text(strip=True).lower():
-                continue
-            href = link.get("href")
-            if not href:
-                continue
-            if href.startswith("http"):
-                return href
-            if href.startswith("/"):
-                return f"https://stratfordpadelclub.matchpoint.com.es{href}"
-            if href.startswith("Info.aspx"):
-                return f"https://stratfordpadelclub.matchpoint.com.es/ActBooking/{href}"
+            if "sign up" in link.get_text(strip=True).lower():
+                signup = link
+                break
+        if signup is None:
+            signup = container.find("a", string=re.compile(r"sign\s*up", re.I))
+
+        if signup is None:
+            return None
+
+        href = signup.get("href")
+        if not href:
+            return None
+        if href.startswith("http"):
+            return href
+        if href.startswith("/"):
+            return f"https://stratfordpadelclub.matchpoint.com.es{href}"
+        if href.startswith("Info.aspx"):
+            return f"https://stratfordpadelclub.matchpoint.com.es/ActBooking/{href}"
         return None
 
     # =========================
