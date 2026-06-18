@@ -95,7 +95,7 @@ class StratfordPadelActivityScraper:
         self._log(f"Found {len(containers)} activity containers in HTML")
 
         for c in containers:
-            title = c.find("span", class_="textoTituloPubli2")
+            title = c.find("span", id=lambda x: x and "LabelNombreActividadValor" in x)
             if not title:
                 continue
 
@@ -129,7 +129,7 @@ class StratfordPadelActivityScraper:
 
     def extract_session_info(self, container) -> Optional[Dict]:
         try:
-            title_span = container.find("span", class_="textoTituloPubli2")
+            title_span = container.find("span", id=lambda x: x and "LabelNombreActividadValor" in x)
             date_span = container.find("span", id=lambda x: x and "LabelHorarioValor" in x)
             time_span = container.find("span", id=lambda x: x and "LabelHoraValor" in x)
             status_span = container.find("span", id=lambda x: x and "LabelEstadoActividadValor" in x)
