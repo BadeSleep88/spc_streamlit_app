@@ -2,7 +2,7 @@ import json
 import re
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import requests
 from bs4 import BeautifulSoup
@@ -85,21 +85,87 @@ class StratfordPadelActivityScraper:
             self._log(f"Error fetching {date}: {e}")
             return None
 
+    @staticmethod
+    def _find_activity_containers(soup: BeautifulSoup):
+        containers = soup.find_all("article", class_="mag-act")
+        if containers:
+            return containers
+        containers = soup.find_all("div", class_="contenedorResultadosBusqueda")
+        if containers:
+            return containers
+        return soup.find_all("div", class_="contenedor2Columnas2")
+
+    @staticmethod
+    def _normalize_time(text: str) -> Optional[str]:
+        if not text:
+            return None
+        match = re.search(r"(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})", text)
+        if not match:
+            return None
+        return f"{match.group(1)}-{match.group(2)}"
+
+    @staticmethod
+    def _normalize_date(text: str) -> Optional[str]:
+        if not text:
+            return None
+        match = re.search(r"(\d{2})[-/](\d{2})[-/](\d{4})", text)
+        if not match:
+            return None
+        return f"{match.group(1)}/{match.group(2)}/{match.group(3)}"
+
+    def _extract_session_date(self, container) -> Optional[str]:
+        signup = container.find("a", href=re.compile(r"Info\.aspx", re.I))
+        if signup:
+            date_str = self._normalize_date(signup.get("href", ""))
+            if date_str:
+                return date_str
+
+        data_el = container.find(attrs={"data-fecha": True})
+        if data_el:
+            date_str = self._normalize_date(data_el.get("data-fecha", ""))
+            if date_str:
+                return date_str
+
+        date_span = container.find("span", id=lambda x: x and "LabelHorarioValor" in x)
+        if date_span:
+            date_str = self._normalize_date(date_span.get_text(" ", strip=True))
+            if date_str:
+                return date_str
+
+        day_header = container.find_parent("section", class_="mag-dia")
+        if day_header:
+            cab = day_header.find("div", class_="mag-dia-cab")
+            if cab:
+                header_text = cab.get_text(" ", strip=True)
+                try:
+                    parsed = datetime.strptime(
+                        re.sub(r"^(Today|Tomorrow|[A-Za-z]+)\s+", "", header_text, flags=re.I),
+                        "%d %B",
+                    )
+                    year = datetime.now().year
+                    candidate = parsed.replace(year=year)
+                    if candidate.date() < datetime.now().date() - timedelta(days=30):
+                        candidate = candidate.replace(year=year + 1)
+                    return candidate.strftime("%d/%m/%Y")
+                except ValueError:
+                    pass
+        return None
+
     def parse_activity_sessions(self, html: str) -> List[Dict]:
         soup = BeautifulSoup(html, "html.parser")
         sessions = []
 
-        containers = soup.find_all("div", class_="contenedorResultadosBusqueda")
-        if not containers:
-            containers = soup.find_all("div", class_="contenedor2Columnas2")
+        containers = self._find_activity_containers(soup)
         self._log(f"Found {len(containers)} activity containers in HTML")
 
         for c in containers:
             title = c.find("span", id=lambda x: x and "LabelNombreActividadValor" in x)
             if not title:
+                title = c.find("span", class_="mag-nombre")
+            if not title:
                 continue
 
-            activity_name = title.get_text(strip=True)
+            activity_name = " ".join(title.get_text(strip=True).split())
             if not any(name in activity_name for name in self.config["activity_search"]["activity_name"]):
                 continue
 
@@ -130,38 +196,26 @@ class StratfordPadelActivityScraper:
     def extract_session_info(self, container) -> Optional[Dict]:
         try:
             title_span = container.find("span", id=lambda x: x and "LabelNombreActividadValor" in x)
+            if not title_span:
+                title_span = container.find("span", class_="mag-nombre")
             date_span = container.find("span", id=lambda x: x and "LabelHorarioValor" in x)
             time_span = container.find("span", id=lambda x: x and "LabelHoraValor" in x)
+            if not time_span:
+                time_span = container.find("span", class_="mag-hora")
             status_span = container.find("span", id=lambda x: x and "LabelEstadoActividadValor" in x)
             instructor_span = container.find("span", id=lambda x: x and "LabelMonitorValor" in x)
             place_span = container.find("span", id=lambda x: x and "LabelLugarValor" in x)
 
-            if not title_span or not date_span:
+            if not title_span:
                 return None
 
-            date_text = date_span.get_text(strip=True)
+            date_text = date_span.get_text(strip=True) if date_span else ""
             time_text = time_span.get_text(strip=True) if time_span else ""
+            time_str = self._normalize_time(time_text) or self._normalize_time(date_text)
+            date_str = self._extract_session_date(container)
 
-            # New layout: date in LabelHorarioValor, time in LabelHoraValor
-            date_match = re.search(r"\d{2}/\d{2}/\d{4}", date_text)
-            time_match = re.search(
-                r"\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}",
-                time_text or date_text,
-            )
-
-            if date_match and time_match:
-                date_str = date_match.group(0)
-                time_str = re.sub(r"\s+", "", time_match.group(0))
-            else:
-                # Legacy layout: "26/05/2026 9:00-10:00" in one span
-                combined = re.search(
-                    r"(\d{2}/\d{2}/\d{4})\s+(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})",
-                    f"{date_text} {time_text}",
-                )
-                if not combined:
-                    return None
-                date_str = combined.group(1)
-                time_str = re.sub(r"\s+", "", combined.group(2))
+            if not date_str or not time_str:
+                return None
 
             status = status_span.get_text(strip=True) if status_span else ""
             vacancies = None
@@ -170,7 +224,7 @@ class StratfordPadelActivityScraper:
                 vacancies = int(vac_match.group(1)) if vac_match else None
 
             return {
-                "type": title_span.get_text(strip=True),
+                "type": " ".join(title_span.get_text(strip=True).split()),
                 "date": date_str,
                 "time": time_str,
                 "day_of_week": datetime.strptime(date_str, "%d/%m/%Y").strftime("%A"),
@@ -190,12 +244,11 @@ class StratfordPadelActivityScraper:
                 signup = link
                 break
         if signup is None:
+            signup = container.find("a", href=re.compile(r"Info\.aspx", re.I))
+        if signup is None:
             signup = container.find("a", string=re.compile(r"sign\s*up", re.I))
 
-        if signup is None:
-            return None
-
-        href = signup.get("href")
+        href = signup.get("href") if signup else None
         if not href:
             return None
         if href.startswith("http"):
@@ -301,18 +354,49 @@ class StratfordPadelActivityScraper:
 
         return sorted(filtered, key=lambda x: datetime.strptime(x["date"], "%d/%m/%Y"))
 
+    def _dates_on_page(self, html: str) -> Set[str]:
+        soup = BeautifulSoup(html, "html.parser")
+        dates = set()
+        for el in soup.find_all(attrs={"data-fecha": True}):
+            normalized = self._normalize_date(el.get("data-fecha", ""))
+            if normalized:
+                dates.add(normalized.replace("/", "-"))
+        for a in soup.find_all("a", href=True):
+            normalized = self._normalize_date(a["href"])
+            if normalized:
+                dates.add(normalized.replace("/", "-"))
+        return dates
+
     def search_for_sessions(self) -> List[Dict]:
         all_sessions = []
+        seen = set()
+        covered_dates = set()
 
         for date in self.get_date_range():
+            if date in covered_dates:
+                continue
+
             html = self.fetch_booking_page(date)
             if html:
+                covered_dates.update(self._dates_on_page(html))
+                covered_dates.add(date)
                 day_sessions = self.parse_activity_sessions(html)
-                all_sessions.extend(day_sessions)
+                for session in day_sessions:
+                    key = (
+                        session["type"],
+                        session["date"],
+                        session["time"],
+                        session.get("instructor", ""),
+                        session.get("place", ""),
+                    )
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    all_sessions.append(session)
                 self._log(f"Total sessions found so far: {len(all_sessions)}")
             time.sleep(0.2)
 
-        self._log(f"Finished fetching sessions. Filtering now...")
+        self._log("Finished fetching sessions. Filtering now...")
         return self.filter_sessions(all_sessions)
 
     # =========================
